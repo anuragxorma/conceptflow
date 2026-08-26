@@ -9,6 +9,7 @@ Run from the project root:
 import numpy as np
 
 import conceptflow as cf
+from conceptflow.cluster import ConceptLatticeEstimator
 
 
 def main():
@@ -22,10 +23,7 @@ def main():
         attributes=["m1", "m2", "m3"],
     )
 
-    lattice = cf.ConceptLattice.from_context(
-        context,
-        algorithm="nextclosure",
-    )
+    lattice = ConceptLatticeEstimator(algorithm="nextclosure").fit(context).get_lattice()
 
     print(context)
     print(lattice)

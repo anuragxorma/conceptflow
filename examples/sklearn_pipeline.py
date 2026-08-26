@@ -9,7 +9,7 @@ Run from the project root:
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from conceptflow.cluster import ConceptLattice
+from conceptflow.cluster import ConceptLatticeEstimator
 from conceptflow.preprocessing import (
     ConceptualScaler,
     NominalScale,
@@ -43,7 +43,7 @@ def main():
         ),
         (
             "lattice",
-            ConceptLattice(algorithm="nextclosure"),
+            ConceptLatticeEstimator(algorithm="nextclosure"),
         ),
     ])
 

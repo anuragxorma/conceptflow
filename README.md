@@ -83,6 +83,7 @@ including a full case study in [`examples/eurovision_nested_diagram.py`](example
 ```python
 import numpy as np
 import conceptflow as cf
+from conceptflow.cluster import ConceptLatticeEstimator
 
 ctx = cf.FormalContext.from_array(
     np.array([
@@ -94,7 +95,7 @@ ctx = cf.FormalContext.from_array(
     attributes=["m1", "m2", "m3"],
 )
 
-lattice = cf.ConceptLattice.from_context(ctx)
+lattice = ConceptLatticeEstimator().fit(ctx).get_lattice()
 
 print(lattice.n_concepts)
 print(lattice.edges)
@@ -105,10 +106,7 @@ print(lattice.edges)
 ConceptFlow currently supports three concept enumeration methods:
 
 ```python
-lattice = cf.ConceptLattice.from_context(
-    ctx,
-    algorithm="nextclosure",
-)
+lattice = ConceptLatticeEstimator(algorithm="nextclosure").fit(ctx).get_lattice()
 ```
 
 Supported algorithms:

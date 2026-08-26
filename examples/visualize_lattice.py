@@ -13,6 +13,7 @@ Output:
 from pathlib import Path
 
 import conceptflow as cf
+from conceptflow.cluster import ConceptLatticeEstimator
 
 
 def main() -> None:
@@ -23,10 +24,7 @@ def main() -> None:
 
     ctx = cf.FormalContext.from_cxt(cxt_path)
 
-    lattice = cf.ConceptLattice.from_context(
-        ctx,
-        algorithm="nextclosure",
-    )
+    lattice = ConceptLatticeEstimator(algorithm="nextclosure").fit(ctx).get_lattice()
 
     print(f"Loaded context: {cxt_path}")
     print(f"Context size: ({ctx.n_objects}, {ctx.n_attributes})")
