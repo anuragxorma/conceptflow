@@ -9,6 +9,12 @@ Each section is marked:
 - **Implementation** — what the code actually computes, and how it relates to
   the theory.
 
+This is the terse, code-pinpointed companion to
+[nested_diagram_tutorial.md](nested_diagram_tutorial.md), which has the full
+proofs, a worked numeric example, and a guide to reading implications off the
+diagram. Proofs here are sketched or stated only; follow the links to the
+tutorial for the complete derivations.
+
 ---
 
 ## 1. The Two Factor Contexts
@@ -108,33 +114,25 @@ Section 4.
 
 ### Theory
 
-For each g ∈ G, the object concept μ(g) ∈ B(K) is the smallest concept
+For each g ∈ G, the object concept γ(g) ∈ B(K) is the smallest concept
 containing g.  Its image under φ is the **atomic coordinate pair**:
 
 ```
-φ(μ(g)) = (π_outer(μ(g)), π_inner(μ(g)))
+φ(γ(g)) = (π_outer(γ(g)), π_inner(γ(g)))
 ```
 
 **Bridging lemma.** In the apposition K = K_outer | K_inner:
 
 ```
-π_outer(μ_K(g)) = μ_{K_outer}(g)
-π_inner(μ_K(g)) = μ_{K_inner}(g)
+π_outer(γ_K(g)) = γ_{K_outer}(g)
+π_inner(γ_K(g)) = γ_{K_inner}(g)
 ```
 
-*Proof.* In K, ext(μ_K(g)) = {g}''_K = objects sharing all of g's outer *and*
-inner attributes.  This set is a subset of {g}''_{K_outer} (which only requires
-sharing outer attributes).  Now:
-
-- {g}''_{K_outer} is already K_outer-closed.
-- g ∈ ext(μ_K(g)) ⊆ {g}''_{K_outer}, so ext(μ_K(g)) lies inside the closed
-  set {g}''_{K_outer}.
-- The closure of any set A with g ∈ A ⊆ {g}''_{K_outer} in K_outer equals
-  {g}''_{K_outer} (it is sandwiched: {g}''_{K_outer} ⊆ A''_{K_outer} ⊆
-  ({g}''_{K_outer})''_{K_outer} = {g}''_{K_outer}).
-
-Therefore ext(π_outer(μ_K(g))) = {g}''_{K_outer} = ext(μ_{K_outer}(g)).  The
-argument for the inner projection is symmetric. ∎
+*Proof sketch.* ext(γ_K(g)) = {g}''_K is sandwiched between g and the already
+K_outer-closed set {g}''_{K_outer}, so its K_outer-closure equals
+{g}''_{K_outer} = ext(γ_{K_outer}(g)). The inner projection is symmetric.
+See the [tutorial](nested_diagram_tutorial.md#4-the-bridging-lemma-why-k-is-never-needed)
+for the full step-by-step proof.
 
 ### Implementation
 
@@ -142,19 +140,20 @@ Because of the bridging lemma, the implementation can compute atomic pairs
 directly from the factor lattices without touching B(K):
 
 ```
-μ_outer(g)  =  smallest concept in B(K_outer) whose extent contains g
-μ_inner(g)  =  smallest concept in B(K_inner) whose extent contains g
+γ_outer(g)  =  smallest concept in B(K_outer) whose extent contains g
+γ_inner(g)  =  smallest concept in B(K_inner) whose extent contains g
 ```
 
-Both are computed by `_mu_local` applied to the outer and template (full-object
-inner) lattices respectively.  The `obj_idx` argument is an integer index into
-the shared object list; the code asserts that this list is identical in both
-contexts before pairing.
+Both are computed by `_gamma_local(lattice)`, applied to the outer and template
+(full-object inner) lattices respectively — it returns a dict keyed by every
+object's integer index in one pass, rather than being called per object. The
+code asserts that the object list is identical (same order) in both contexts
+before pairing on that shared index.
 
 The seed set is
 
 ```
-P_0 = { (μ_outer(g), μ_inner(g)) : g ∈ G }  ∪  { (⊥_outer, ⊥_inner) }
+P_0 = { (γ_outer(g), γ_inner(g)) : g ∈ G }  ∪  { (⊥_outer, ⊥_inner) }
 ```
 
 The bottom pair is added explicitly because ⊥_K has an empty extent; no object
@@ -180,16 +179,16 @@ the inner scale.
 Since every concept C ∈ B(K) satisfies
 
 ```
-C = ∨{ μ(g) : g ∈ ext(C) }
+C = ∨{ γ(g) : g ∈ ext(C) }
 ```
 
-(provable because for a closed set A, A = ∪{ext(μ(g)) : g ∈ A}), the image
-of φ equals the join-closure of {φ(μ(g)) : g ∈ G} ∪ {φ(⊥_K)}.
+(provable because for a closed set A, A = ∪{ext(γ(g)) : g ∈ A}), the image
+of φ equals the join-closure of {φ(γ(g)) : g ∈ G} ∪ {φ(⊥_K)}.
 
 ### Implementation
 
 The code applies the join-closure directly in the factor lattices using the
-atomic pairs from Section 4 in place of {φ(μ(g))}.  This is valid by the
+atomic pairs from Section 4 in place of {φ(γ(g))}.  This is valid by the
 bridging lemma:
 
 ```
@@ -212,16 +211,16 @@ P* = ⋃_{n ≥ 0} P_n  =  image(φ)
 Two containments establish the equality.
 
 **P* ⊆ image(φ).** Every element of P* is a finite join of pairs from P_0.
-Each pair in P_0 is φ(μ(g)) or φ(⊥_K) by the bridging lemma.  Because φ
+Each pair in P_0 is φ(γ(g)) or φ(⊥_K) by the bridging lemma.  Because φ
 preserves joins, any join of such pairs is the image of the corresponding join
 in B(K), hence lies in image(φ).
 
-**image(φ) ⊆ P*.** Every C ∈ B(K) satisfies C = ∨{μ(g) : g ∈ ext(C)}.
+**image(φ) ⊆ P*.** Every C ∈ B(K) satisfies C = ∨{γ(g) : g ∈ ext(C)}.
 Applying φ and join-preservation:
 
 ```
-φ(C) = ∨{ φ(μ(g)) : g ∈ ext(C) }
-     = ∨{ (μ_outer(g), μ_inner(g)) : g ∈ ext(C) }   [by the bridging lemma]
+φ(C) = ∨{ φ(γ(g)) : g ∈ ext(C) }
+     = ∨{ (γ_outer(g), γ_inner(g)) : g ∈ ext(C) }   [by the bridging lemma]
      ∈ P*
 ```
 

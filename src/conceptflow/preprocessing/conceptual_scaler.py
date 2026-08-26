@@ -214,6 +214,11 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
             dtype=bool,
         )
 
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.input_tags.allow_nan = True
+        return tags
+
     def get_feature_names_out(self, input_features=None):
         """
         Return output feature names for the scaled binary attributes.

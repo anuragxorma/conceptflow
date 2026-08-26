@@ -1,23 +1,81 @@
 # ConceptFlow
 
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-BSD--3--Clause-green)
+![Status](https://img.shields.io/badge/status-experimental-orange)
+
 ConceptFlow is a scikit-learn compatible Formal Concept Analysis (FCA) framework.
 
 The goal is to combine FCA-native mathematical structures with modern Python machine learning workflows.
 
+## Installation
+
+ConceptFlow is not yet on PyPI. Install from source:
+
+```bash
+git clone https://github.com/anuragxorma/conceptflow
+cd conceptflow
+pip install -e ".[dev]"
+```
+
+### Java requirement for nested diagrams
+
+Nested-diagram layout (`plot_nested`, and anything using the DimFlux/DimDraw
+layout engine) shells out to a bundled Java tool, so a JRE (Java 11+) must be
+installed and available as `java` on `PATH`. Core FCA computation (contexts,
+lattices, scaling, enumeration) does not need Java — only nested-diagram
+rendering does.
+
+```bash
+# Debian/Ubuntu
+sudo apt install default-jre
+
+# macOS (Homebrew)
+brew install openjdk
+
+# Verify it's on PATH
+java -version
+```
+
+If you'd rather not put a JRE on `PATH`, point ConceptFlow at a specific
+binary instead:
+
+```bash
+export CONCEPTFLOW_JAVA_BIN=/path/to/java
+```
+
+Runnable versions of every code snippet below live in [`examples/`](examples/),
+including a full case study in [`examples/eurovision_nested_diagram.py`](examples/eurovision_nested_diagram.py).
+
 ## Current features
 
+**Core FCA structures**
 - Binary formal contexts
 - Many-valued contexts
 - Formal concepts
 - Concept lattice construction
+
+**Algorithms**
 - Brute-force, NextClosure, and CloseByOne concept enumeration
+
+**Preprocessing**
 - Conceptual scaling with seven scale types
 - scikit-learn compatible preprocessing
+
+**scikit-learn estimators**
 - scikit-learn compatible lattice estimator
+
+**Visualization**
 - Nested line diagrams (subdirect decomposition)
 - Interactive nested diagram visualization
+
+**I/O**
 - Burmeister `.cxt` read/write support
+
+**Metrics**
 - Basic support and confidence metrics
+
+**Decomposition**
 - Ordinal two-factorization
 
 ## Basic usage
@@ -210,7 +268,7 @@ GeneralScale(
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
-from conceptflow.cluster import ConceptLattice
+from conceptflow.cluster import ConceptLatticeEstimator
 from conceptflow.preprocessing import (
     ConceptualScaler,
     NominalScale,
@@ -242,7 +300,7 @@ pipe = Pipeline([
     ),
     (
         "lattice",
-        ConceptLattice(algorithm="nextclosure"),
+        ConceptLatticeEstimator(algorithm="nextclosure"),
     ),
 ])
 
@@ -314,7 +372,7 @@ builder.expand_all(
 To expand only a single concept:
 
 ```python
-top_concept = outer_view.lattice.top_concept()
+top_concept = outer_view.lattice.top()
 builder.expand(
     parent=outer_view,
     concept=top_concept,
@@ -336,8 +394,8 @@ fig = plot_nested(
     object_label=lambda name: name[:3],  # optional label callback
 )
 
-fig.show()          # display in Jupyter
-fig.save("out.html")  # export to HTML
+fig.show()               # display in Jupyter
+fig.write_html("out.html")  # export to HTML
 ```
 
 `plot_nested` computes the subdirect product of the two factor lattices using the
@@ -444,11 +502,15 @@ factor_1, factor_2 = model.factors_
 coverage = model.coverage_
 ```
 
-`ExactOrdinalTwoFactorizer` implements exact ordinal two-factorization for
-contexts that already admit a two-factorization.
+`ExactOrdinalTwoFactorizer` implements *exact* ordinal two-factorization
+(Dürrschnabel & Stumme, Algorithm 1) for contexts whose complement concept
+lattice has order dimension at most 2. Finding the realizer pair of linear
+extensions is a brute-force search, intended for small contexts.
 
-The full `Ord2Factor` algorithm for maximal ordinal two-factorizations is
-reserved for future implementation. It additionally requires algorithms for:
+The full `Ord2Factor` algorithm for maximal ordinal two-factorizations
+(arbitrary order dimension) is a documented stub — calling `.fit()` raises
+`NotImplementedError` — and is reserved for future implementation. It
+additionally requires algorithms for:
 
 - maximal induced bipartite subgraph selection,
 - incompatibility-graph reduction,
@@ -486,7 +548,7 @@ Examples include:
 
 - `ConceptualScaler`
 - `ConceptMembershipEncoder`
-- `ConceptLattice`
+- `ConceptLatticeEstimator`
 - `ExactOrdinalTwoFactorizer`
 
 ConceptFlow is inspired by the design philosophy of projects such as
@@ -495,7 +557,11 @@ Analysis and symbolic data analysis.
 
 Because FCA works with symbolic and order-theoretic structures rather than
 purely numerical arrays, not all components are expected to satisfy the full
-`sklearn.utils.estimator_checks.check_estimator` suite.
+`sklearn.utils.estimator_checks.check_estimator` suite. Concretely,
+`ConceptualScaler`, `ConceptMembershipEncoder`, and `ConceptLatticeEstimator`
+each pass every check except `check_transformer_preserve_dtypes`, since all
+three always output `bool` (concept membership and scaled attributes are
+yes/no predicates, not values to dtype-cast).
 
 Core FCA structures such as:
 
@@ -554,6 +620,17 @@ This separation allows the same FCA structures to be reused across:
 - symbolic analysis,
 - visualization systems,
 - interactive conceptual exploration.
+
+## Further reading
+
+- [docs/architecture.md](docs/architecture.md) — the full layered-architecture design.
+- [docs/nested_diagram_tutorial.md](docs/nested_diagram_tutorial.md) — tutorial on nested line diagrams.
+- [docs/nested_diagram_construction.md](docs/nested_diagram_construction.md) — mathematical construction of the join-closure algorithm.
+- [Eurovision case study](https://kde.cs.uni-kassel.de/blogs/esc) — worked example and interactive diagram.
+
+## License
+
+BSD-3-Clause. See [LICENSE](LICENSE).
 
 ## Status
 

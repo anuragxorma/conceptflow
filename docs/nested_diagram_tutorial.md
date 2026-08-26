@@ -139,10 +139,10 @@ knowledge of $\mathcal{B}(K)$ beyond the object concepts of each factor.
 >
 > **Seed set:**
 > $$
-> P_0 = \bigl\{(\mu_\text{outer}(g),\; \mu_\text{inner}(g)) : g \in G\bigr\}
+> P_0 = \bigl\{(\gamma_\text{outer}(g),\; \gamma_\text{inner}(g)) : g \in G\bigr\}
 >       \cup \bigl\{(\bot_\text{outer},\; \bot_\text{inner})\bigr\}
 > $$
-> where $\mu_\text{outer}(g)$ is the object concept of $g$ in $\mathcal{B}(K_\text{outer})$
+> where $\gamma_\text{outer}(g)$ is the object concept of $g$ in $\mathcal{B}(K_\text{outer})$
 > and similarly for inner.
 >
 > **Closure step:** repeat until no new pairs appear:
@@ -173,17 +173,17 @@ Together they give both containments.
 >
 > For any concept $C \in \mathcal{B}(K)$:
 > $$
-> C = \bigvee\{\mu(g) : g \in \operatorname{ext}(C)\}
+> C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}
 > $$
 
 > *Proof.*
-> Write $A = \operatorname{ext}(C)$. For each $g \in A$, the object concept $\mu(g)$
-> is the smallest concept containing $g$. Since $C$ contains $g$, we have $\mu(g) \leq C$
-> for all $g \in A$, so the join $J = \bigvee\{\mu(g) : g \in A\}$ satisfies $J \leq C$.
+> Write $A = \operatorname{ext}(C)$. For each $g \in A$, the object concept $\gamma(g)$
+> is the smallest concept containing $g$. Since $C$ contains $g$, we have $\gamma(g) \leq C$
+> for all $g \in A$, so the join $J = \bigvee\{\gamma(g) : g \in A\}$ satisfies $J \leq C$.
 >
-> For the reverse: $\operatorname{ext}(J) = \bigl(\bigcup\{\operatorname{ext}(\mu(g)) : g \in A\}\bigr)''$.
-> Since $g \in \operatorname{ext}(\mu(g))$ for every $g$, we have
-> $A \subseteq \bigcup\{\operatorname{ext}(\mu(g)) : g \in A\}$,
+> For the reverse: $\operatorname{ext}(J) = \bigl(\bigcup\{\operatorname{ext}(\gamma(g)) : g \in A\}\bigr)''$.
+> Since $g \in \operatorname{ext}(\gamma(g))$ for every $g$, we have
+> $A \subseteq \bigcup\{\operatorname{ext}(\gamma(g)) : g \in A\}$,
 > so $A'' \subseteq \operatorname{ext}(J)$. But $A'' = A$ because $A = \operatorname{ext}(C)$
 > is $K$-closed. Thus $A \subseteq \operatorname{ext}(J)$, meaning $C \leq J$.
 >
@@ -228,19 +228,19 @@ Together they give both containments.
 > *Proof — two containments.*
 >
 > **$P^* \subseteq \operatorname{image}(\varphi)$.**
-> The seed set $P_0$ consists of pairs $\varphi(\mu(g))$ and $\varphi(\bot_K)$, all lying
+> The seed set $P_0$ consists of pairs $\varphi(\gamma(g))$ and $\varphi(\bot_K)$, all lying
 > in $\operatorname{image}(\varphi)$. The join-closure adds joins of existing pairs. By
 > Proposition 2, any join of pairs in $\operatorname{image}(\varphi)$ is again in
 > $\operatorname{image}(\varphi)$. By induction, $P^* \subseteq \operatorname{image}(\varphi)$.
 >
 > **$\operatorname{image}(\varphi) \subseteq P^*$.**
 > Take any $C \in \mathcal{B}(K)$. By Proposition 1,
-> $C = \bigvee\{\mu(g) : g \in \operatorname{ext}(C)\}$. Applying $\varphi$ and
+> $C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}$. Applying $\varphi$ and
 > Proposition 2:
 > $$
 > \varphi(C)
-> = \bigvee\{\varphi(\mu(g)) : g \in \operatorname{ext}(C)\}
-> = \bigvee\{(\mu_{K_\text{outer}}(g),\; \mu_{K_\text{inner}}(g))
+> = \bigvee\{\varphi(\gamma(g)) : g \in \operatorname{ext}(C)\}
+> = \bigvee\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g))
 >            : g \in \operatorname{ext}(C)\}
 > \in P^*
 > $$
@@ -253,11 +253,11 @@ Together they give both containments.
 ## 4. The Bridging Lemma: Why K Is Never Needed
 
 Parts 2 and 3 established that $P^* = \operatorname{image}(\varphi)$ when the seed pairs
-are $\{(\pi_\text{outer}(\mu_K(g)),\; \pi_\text{inner}(\mu_K(g))) : g \in G\}$.
-Computing these seeds naïvely requires knowing the object concepts $\mu_K(g)$ inside
+are $\{(\pi_\text{outer}(\gamma_K(g)),\; \pi_\text{inner}(\gamma_K(g))) : g \in G\}$.
+Computing these seeds naïvely requires knowing the object concepts $\gamma_K(g)$ inside
 $\mathcal{B}(K)$, which requires building $K$.
 
-The bridging lemma shortcuts this: it says the projections of $\mu_K(g)$ equal the
+The bridging lemma shortcuts this: it says the projections of $\gamma_K(g)$ equal the
 object concepts inside each factor lattice directly.
 
 ### The apposition structure
@@ -280,15 +280,15 @@ implementation enforces this with a runtime `ValueError`.
 >
 > In the apposition $K = K_\text{outer} \mid K_\text{inner}$, for every object $g \in G$:
 > $$
-> \pi_\text{outer}(\mu_K(g)) = \mu_{K_\text{outer}}(g)
+> \pi_\text{outer}(\gamma_K(g)) = \gamma_{K_\text{outer}}(g)
 > \qquad
-> \pi_\text{inner}(\mu_K(g)) = \mu_{K_\text{inner}}(g)
+> \pi_\text{inner}(\gamma_K(g)) = \gamma_{K_\text{inner}}(g)
 > $$
 > The projection of the $K$-object concept equals the factor-lattice object concept.
 
 > *Proof (outer projection; inner is symmetric).*
 >
-> Let $A = \operatorname{ext}(\mu_K(g)) = \{g\}''_K$. We need to show that the
+> Let $A = \operatorname{ext}(\gamma_K(g)) = \{g\}''_K$. We need to show that the
 > $K_\text{outer}$-closure of $A$ equals $\{g\}''_{K_\text{outer}}$.
 >
 > **Step 1.** $A \subseteq \{g\}''_{K_\text{outer}}$. Any $h \in A$ shares all of $g$'s
@@ -304,7 +304,7 @@ implementation enforces this with a runtime `ValueError`.
 > = \{g\}''_{K_\text{outer}}
 > $$
 > So $A''_{K_\text{outer}} = \{g\}''_{K_\text{outer}}$, i.e.,
-> $\operatorname{ext}(\pi_\text{outer}(\mu_K(g))) = \operatorname{ext}(\mu_{K_\text{outer}}(g))$.
+> $\operatorname{ext}(\pi_\text{outer}(\gamma_K(g))) = \operatorname{ext}(\gamma_{K_\text{outer}}(g))$.
 > $\square$
 
 ### Consequence
@@ -312,17 +312,17 @@ implementation enforces this with a runtime `ValueError`.
 By the bridging lemma, the seed set of the join-closure algorithm becomes:
 
 $$
-P_0 = \bigl\{(\mu_{K_\text{outer}}(g),\; \mu_{K_\text{inner}}(g)) : g \in G\bigr\}
+P_0 = \bigl\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\bigr\}
       \cup \bigl\{(\bot_\text{outer},\; \bot_\text{inner})\bigr\}
 $$
 
-Both $\mu_{K_\text{outer}}(g)$ and $\mu_{K_\text{inner}}(g)$ are computed directly from
+Both $\gamma_{K_\text{outer}}(g)$ and $\gamma_{K_\text{inner}}(g)$ are computed directly from
 the factor lattices, without ever constructing $K$ or $\mathcal{B}(K)$.
 
 > **Key insight:** The bridging lemma is the keystone. Part 3 proved that
-> $\operatorname{image}(\varphi) = $ join-closure of $\{\varphi(\mu_K(g))\}$. The
-> bridging lemma proves that $\varphi(\mu_K(g)) = (\mu_{K_\text{outer}}(g),\,
-> \mu_{K_\text{inner}}(g))$, making the whole computation factor-local. The combined
+> $\operatorname{image}(\varphi) = $ join-closure of $\{\varphi(\gamma_K(g))\}$. The
+> bridging lemma proves that $\varphi(\gamma_K(g)) = (\gamma_{K_\text{outer}}(g),\,
+> \gamma_{K_\text{inner}}(g))$, making the whole computation factor-local. The combined
 > context $K$ is an abstract object referenced in the proof but never materialised
 > in code.
 
@@ -338,12 +338,13 @@ many-valued attribute. Two separate scalers produce the two factor contexts:
 
 ```python
 # builder.root() internally does:
-outer_context = ConceptualScaler(scales=outer_scales).fit_transform(mvc)
+outer_context = ConceptualScaler(scales=outer_scales, output="context").fit_transform(mvc)
 # → FormalContext with objects=winners, attributes=M_outer
 
-# builder.expand_all() internally does:
-inner_context = ConceptualScaler(scales=inner_scales).fit_transform(
-    mvc.restrict_objects(top_concept_extent)  # full extent for template
+# builder.expand_all() internally does, for the top outer concept:
+object_names = [mvc.objects[i] for i in sorted(top_concept.extent)]
+inner_context = ConceptualScaler(scales=inner_scales, output="context").fit_transform(
+    mvc.restrict_objects(object_names)  # full extent for template
 )
 ```
 
@@ -371,63 +372,86 @@ template_view.context   # FormalContext K_inner (all objects)
 template_view.lattice   # ConceptLattice B(K_inner)
 ```
 
-### _mu_local: finding the object concept
+### _gamma_local: finding the object concept
 
 ```python
-def _mu_local(lattice, obj_idx):
-    """Smallest concept in lattice whose extent contains obj_idx."""
-    best = None
-    best_size = float("inf")
-    for cid, concept in lattice.concepts.items():
-        if obj_idx in concept.extent:
-            if len(concept.extent) < best_size:
-                best, best_size = cid, len(concept.extent)
-    return best
+def _gamma_local(lattice) -> dict[int, str]:
+    """γ(g): stable_id of the concept with the SMALLEST extent still containing g."""
+    result = {}
+    for obj_idx in range(lattice.context.n_objects):
+        candidates = [c for c in lattice.concepts if obj_idx in c.extent]
+        if candidates:
+            result[obj_idx] = min(candidates, key=lambda c: len(c.extent)).stable_id()
+    return result
 ```
 
-The concept with the smallest extent containing $g$ is exactly $\mu(g)$ by definition —
-the object concept is the most specific concept that still has $g$ in scope.
+The concept with the smallest extent containing $g$ is exactly $\gamma(g)$ by definition —
+the object concept is the most specific concept that still has $g$ in scope. The real
+function computes this for every object in the lattice at once, keyed by object index.
 
 ### _compute_filled_pairs: the join-closure loop
 
 ```python
-def _compute_filled_pairs(view, template_view):
-    # Shared object ordering assertion
-    assert list(view.context.objects) == list(template_view.context.objects)
+def _compute_filled_pairs(
+    outer_lattice,
+    inner_lattice,
+    gamma_outer: dict[int, str],   # obj_idx → outer concept stable_id
+    gamma_inner: dict[int, str],   # obj_idx → inner concept stable_id
+) -> dict[str, set[str]]:
+    outer_concepts = list(outer_lattice.concepts)
+    inner_concepts = list(inner_lattice.concepts)
+    outer_ext = {c.stable_id(): c.extent for c in outer_concepts}
+    inner_ext = {c.stable_id(): c.extent for c in inner_concepts}
 
-    mu_outer = {}   # obj_idx → outer concept ID
-    mu_inner = {}   # obj_idx → inner concept ID
-    n = view.context.n_objects
+    def _lat_join(ext_by_id, concept_list, id1, id2):
+        # Join = smallest concept whose extent ⊇ extent(id1) ∪ extent(id2).
+        combined = ext_by_id[id1] | ext_by_id[id2]
+        best = None
+        for c in concept_list:
+            if combined <= c.extent and (best is None or len(c.extent) < len(best.extent)):
+                best = c
+        return best.stable_id()
 
-    for i in range(n):
-        mu_outer[i] = _mu_local(view.lattice, i)
-        mu_inner[i] = _mu_local(template_view.lattice, i)
+    def outer_join(id1, id2):
+        return _lat_join(outer_ext, outer_concepts, id1, id2)
 
-    # Seed: atomic pairs + explicit bottom
-    pairs = set((mu_outer[i], mu_inner[i]) for i in range(n))
-    pairs.add((bottom_outer_id, bottom_inner_id))
+    def inner_join(id1, id2):
+        return _lat_join(inner_ext, inner_concepts, id1, id2)
 
-    # Join-closure
+    # Seed: atomic pairs + explicit bottom pair
+    pairs = {(gamma_outer[i], gamma_inner[i]) for i in gamma_outer if i in gamma_inner}
+    bot_outer = min(outer_concepts, key=lambda c: len(c.extent)).stable_id()
+    bot_inner = min(inner_concepts, key=lambda c: len(c.extent)).stable_id()
+    pairs.add((bot_outer, bot_inner))
+
+    # Close under componentwise joins until fixpoint
     changed = True
     while changed:
         changed = False
-        new_pairs = set()
-        for (co1, ci1) in pairs:
-            for (co2, ci2) in pairs:
-                jo = join_in_lattice(view.lattice, co1, co2)
-                ji = join_in_lattice(template_view.lattice, ci1, ci2)
-                if (jo, ji) not in pairs:
-                    new_pairs.add((jo, ji))
+        pairs_list = list(pairs)
+        for i in range(len(pairs_list)):
+            for j in range(i + 1, len(pairs_list)):
+                o1, i1 = pairs_list[i]
+                o2, i2 = pairs_list[j]
+                new_pair = (outer_join(o1, o2), inner_join(i1, i2))
+                if new_pair not in pairs:
+                    pairs.add(new_pair)
                     changed = True
-        pairs |= new_pairs
 
-    return pairs
+    result: dict[str, set[str]] = {}
+    for oid, iid in pairs:
+        result.setdefault(oid, set()).add(iid)
+    return result
 ```
+
+This is the real implementation from `src/conceptflow/visualization/nested.py`,
+reproduced verbatim (the gamma dicts are computed once by `_gamma_local` and
+passed in, rather than recomputed inside this function).
 
 ### Why the object ordering matters
 
-The index $i$ is used as a shared key to pair $\mu_\text{outer}(g)$ with
-$\mu_\text{inner}(g)$ for the same object $g$. If the outer and inner contexts stored
+The index $i$ is used as a shared key to pair $\gamma_\text{outer}(g)$ with
+$\gamma_\text{inner}(g)$ for the same object $g$. If the outer and inner contexts stored
 their objects in different orders, index 3 in the outer lattice would be a different
 winner than index 3 in the inner lattice, and the seed pairs would be wrong — pairing
 unrelated concepts. The assertion catches this before any damage is done.
@@ -476,7 +500,7 @@ Joining two concepts moves upward, keeping only the shared constraints.
 
 ### The nine winners
 
-| Year | Artist            | Country | $\mu_\text{outer}$ intent | $\mu_\text{inner}$ intent |
+| Year | Artist            | Country | $\gamma_\text{outer}$ intent | $\gamma_\text{inner}$ intent |
 |------|-------------------|---------|---------------------------|---------------------------|
 | 1982 | Nicole            | DE      | `{p, h}`                  | `{a, m}`                  |
 | 1992 | Linda Martin      | IE      | `{r, c, h}`               | `∅` (top)                 |
@@ -606,15 +630,15 @@ of generators under join-closure generates exactly that sublattice.
 
 ### Step 3: find the generators
 
-By Proposition 1, every concept $C = \bigvee\{\mu(g) : g \in \operatorname{ext}(C)\}$.
-So $\varphi(C) = \bigvee\{\varphi(\mu(g)) : g \in \operatorname{ext}(C)\}$. The entire
-image is generated by the *atomic pairs* $\{\varphi(\mu(g)) : g \in G\}$ plus the
+By Proposition 1, every concept $C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}$.
+So $\varphi(C) = \bigvee\{\varphi(\gamma(g)) : g \in \operatorname{ext}(C)\}$. The entire
+image is generated by the *atomic pairs* $\{\varphi(\gamma(g)) : g \in G\}$ plus the
 bottom pair.
 
 ### Step 4: replace B(K)-objects with factor-lattice objects
 
-The atomic pairs require knowing $\mu_K(g)$ inside $\mathcal{B}(K)$. The bridging lemma
-(Part 4) resolves this: $\pi_\text{outer}(\mu_K(g)) = \mu_{K_\text{outer}}(g)$. Both
+The atomic pairs require knowing $\gamma_K(g)$ inside $\mathcal{B}(K)$. The bridging lemma
+(Part 4) resolves this: $\pi_\text{outer}(\gamma_K(g)) = \gamma_{K_\text{outer}}(g)$. Both
 factor object concepts are computable from the factor lattices alone.
 
 ### Step 5: the algorithm falls out
@@ -622,7 +646,7 @@ factor object concepts are computable from the factor lattices alone.
 $$
 \operatorname{image}(\varphi)
 = \text{join-closure of }
-\bigl\{(\mu_{K_\text{outer}}(g),\; \mu_{K_\text{inner}}(g)) : g \in G\bigr\}
+\bigl\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\bigr\}
 \cup \{(\bot, \bot)\}
 $$
 

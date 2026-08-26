@@ -37,7 +37,7 @@ from conceptflow import ExplorationBuilder, ManyValuedContext
 from conceptflow.preprocessing import DichotomicScale, GeneralScale, ThresholdScale
 from conceptflow.visualization import debug_bottom_outer, plot_nested
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
-from conceptflow.visualization.nested import _compute_filled_pairs, _mu_local
+from conceptflow.visualization.nested import _compute_filled_pairs, _gamma_local
 
 
 DATASET_ROOT = Path("examples/eurovision-dataset/data/senior")
@@ -439,9 +439,9 @@ def compute_implication_basis(root) -> list[dict]:
             pseudo_intents[P] = closures[P]
 
     # Pre-compute filled pairs for the diagram-impact count.
-    mu_o = _mu_local(root.lattice)
-    mu_i = _mu_local(root.children[top_id].lattice)
-    filled_by_outer = _compute_filled_pairs(root.lattice, root.children[top_id].lattice, mu_o, mu_i)
+    gamma_o = _gamma_local(root.lattice)
+    gamma_i = _gamma_local(root.children[top_id].lattice)
+    filled_by_outer = _compute_filled_pairs(root.lattice, root.children[top_id].lattice, gamma_o, gamma_i)
 
     oc_list = list(root.lattice.concepts)
     ic_list = list(root.children[top_id].lattice.concepts)

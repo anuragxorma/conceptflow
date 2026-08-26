@@ -6,8 +6,8 @@ Nested diagram visualization support.
 This module connects the exploration layer to a browser-rendered nested
 diagram implementing Toscana-style subdirect decomposition:
 
-- Reduced labels: attributes only at γ(m) (concept with largest extent
-  introducing m), objects only at μ(g) (concept with smallest extent
+- Reduced labels: attributes only at μ(m) (concept with largest extent
+  introducing m), objects only at γ(g) (concept with smallest extent
   containing g).
 - Attribute labels ABOVE node, object labels BELOW node.
 - Subdirect decomposition preview: every outer node shows the same inner
@@ -38,8 +38,8 @@ from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimfl
 from conceptflow.visualization.html_figure import HTMLFigure
 
 
-def _gamma_local(lattice) -> dict[int, str]:
-    """γ(m): stable_id of the concept with the LARGEST extent having m in its intent."""
+def _mu_local(lattice) -> dict[int, str]:
+    """μ(m): stable_id of the concept with the LARGEST extent having m in its intent."""
     result = {}
     for attr_idx in range(lattice.context.n_attributes):
         candidates = [c for c in lattice.concepts if attr_idx in c.intent]
@@ -48,8 +48,8 @@ def _gamma_local(lattice) -> dict[int, str]:
     return result
 
 
-def _mu_local(lattice) -> dict[int, str]:
-    """μ(g): stable_id of the concept with the SMALLEST extent still containing g."""
+def _gamma_local(lattice) -> dict[int, str]:
+    """γ(g): stable_id of the concept with the SMALLEST extent still containing g."""
     result = {}
     for obj_idx in range(lattice.context.n_objects):
         candidates = [c for c in lattice.concepts if obj_idx in c.extent]
@@ -62,29 +62,29 @@ def _inner_template_data(template_view: ExplorationView) -> dict[str, Any]:
     """
     Build the shared inner template from the ⊤ outer concept's child view.
 
-    Returns a dict with 'nodes', 'edges', and 'mu_by_name'.
-    'mu_by_name' is a helper popped by the caller before embedding in JSON.
+    Returns a dict with 'nodes', 'edges', and 'gamma_by_name'.
+    'gamma_by_name' is a helper popped by the caller before embedding in JSON.
 
     new_objects are NOT included in the template nodes: they depend on which
-    outer concept we are currently at (μ_outer) and are injected per outer
+    outer concept we are currently at (γ_outer) and are injected per outer
     concept when building the synthetic click-through child view.
     """
     inner_gd = lattice_to_graph_data_dimflux(template_view.lattice, stable_ids=True)
 
-    gamma_inner = _gamma_local(template_view.lattice)
-    mu_inner_idx = _mu_local(template_view.lattice)  # obj_idx → stable_id
+    mu_inner = _mu_local(template_view.lattice)
+    gamma_inner_idx = _gamma_local(template_view.lattice)  # obj_idx → stable_id
 
     inner_by_attrs: dict[str, list[str]] = {
         c.stable_id(): [] for c in template_view.lattice.concepts
     }
 
-    for attr_idx, cid in gamma_inner.items():
+    for attr_idx, cid in mu_inner.items():
         inner_by_attrs[cid].append(template_view.context.attributes[attr_idx])
 
-    # μ_inner by object name: used to place object labels in the click-through.
-    mu_by_name: dict[str, str] = {
+    # γ_inner by object name: used to place object labels in the click-through.
+    gamma_by_name: dict[str, str] = {
         template_view.context.objects[obj_idx]: cid
-        for obj_idx, cid in mu_inner_idx.items()
+        for obj_idx, cid in gamma_inner_idx.items()
     }
 
     return {
@@ -105,15 +105,15 @@ def _inner_template_data(template_view: ExplorationView) -> dict[str, Any]:
             {"source": e.source, "target": e.target}
             for e in inner_gd.edges
         ],
-        "mu_by_name": mu_by_name,
+        "gamma_by_name": gamma_by_name,
     }
 
 
 def _compute_filled_pairs(
     outer_lattice,
     inner_lattice,
-    mu_outer: dict[int, str],
-    mu_inner: dict[int, str],
+    gamma_outer: dict[int, str],
+    gamma_inner: dict[int, str],
 ) -> dict[str, set[str]]:
     """
     Compute filled (outer_id, inner_id) coordinate pairs of the subdirect product.
@@ -121,7 +121,7 @@ def _compute_filled_pairs(
     A pair is filled iff it is the projection of some concept in B(K) — the full
     combined lattice — onto the two factor lattices.  By the join-generation
     theorem this equals the join-closure (in the direct product B(K_outer) ×
-    B(K_inner)) of the atomic pairs {(μ_outer(g), μ_inner(g)) : g ∈ G} together
+    B(K_inner)) of the atomic pairs {(γ_outer(g), γ_inner(g)) : g ∈ G} together
     with the bottom pair (⊥_outer, ⊥_inner).
 
     Returns: outer concept stable_id → set of filled inner concept stable_ids.
@@ -149,8 +149,8 @@ def _compute_filled_pairs(
 
     # Atomic coordinate pairs — one per object.
     pairs: set[tuple[str, str]] = set()
-    for obj_idx, oid in mu_outer.items():
-        iid = mu_inner.get(obj_idx)
+    for obj_idx, oid in gamma_outer.items():
+        iid = gamma_inner.get(obj_idx)
         if iid is not None:
             pairs.add((oid, iid))
 
@@ -204,8 +204,8 @@ def debug_filled_pairs(view: ExplorationView) -> None:
         "Object order mismatch between outer and inner contexts."
     )
 
-    mu_outer = _mu_local(view.lattice)
-    mu_inner = _mu_local(template_view.lattice)
+    gamma_outer = _gamma_local(view.lattice)
+    gamma_inner = _gamma_local(template_view.lattice)
 
     outer_concepts = list(view.lattice.concepts)
     inner_concepts = list(template_view.lattice.concepts)
@@ -248,8 +248,8 @@ def debug_filled_pairs(view: ExplorationView) -> None:
     bot_inner = min(inner_concepts, key=lambda c: len(c.extent)).stable_id()
     pair_reason[(bot_outer, bot_inner)] = "bottom pair"
 
-    for obj_idx, oid in mu_outer.items():
-        iid = mu_inner.get(obj_idx)
+    for obj_idx, oid in gamma_outer.items():
+        iid = gamma_inner.get(obj_idx)
         if iid is not None:
             pair = (oid, iid)
             obj_name = outer_obj_names[obj_idx]
@@ -366,8 +366,8 @@ def debug_bottom_outer(view: ExplorationView) -> None:
         return
 
     # --- Setup ---
-    mu_outer = _mu_local(view.lattice)
-    mu_inner = _mu_local(template_view.lattice)
+    gamma_outer = _gamma_local(view.lattice)
+    gamma_inner = _gamma_local(template_view.lattice)
 
     outer_concepts = list(view.lattice.concepts)
     inner_concepts = list(template_view.lattice.concepts)
@@ -409,15 +409,15 @@ def debug_bottom_outer(view: ExplorationView) -> None:
     bot_inner = min(inner_concepts, key=lambda c: len(c.extent)).stable_id()
     pair_reason[(bot_outer, bot_inner)] = "bottom pair (⊥_outer, ⊥_inner)"
 
-    for obj_idx, oid in mu_outer.items():
-        iid = mu_inner.get(obj_idx)
+    for obj_idx, oid in gamma_outer.items():
+        iid = gamma_inner.get(obj_idx)
         if iid is not None:
             pair = (oid, iid)
             obj_name = outer_obj_names[obj_idx]
             if pair not in pair_reason:
-                pair_reason[pair] = f"atomic pair: μ_outer({obj_name!r})={oid}, μ_inner({obj_name!r})={iid}"
+                pair_reason[pair] = f"atomic pair: γ_outer({obj_name!r})={oid}, γ_inner({obj_name!r})={iid}"
             elif "bottom pair" in pair_reason[pair]:
-                pair_reason[pair] += f" + atomic pair: μ_outer({obj_name!r})={oid}, μ_inner({obj_name!r})={iid}"
+                pair_reason[pair] += f" + atomic pair: γ_outer({obj_name!r})={oid}, γ_inner({obj_name!r})={iid}"
             else:
                 pair_reason[pair] += f" + atomic({obj_name!r})"
 
@@ -515,9 +515,9 @@ def exploration_view_to_nested_data(
     """
     graph_data = lattice_to_graph_data_dimflux(view.lattice, stable_ids=True)
 
-    # Reduced labeling: γ and μ for this view's lattice.
-    gamma = _gamma_local(view.lattice)
+    # Reduced labeling: μ(m) and γ(g) for this view's lattice.
     mu = _mu_local(view.lattice)
+    gamma = _gamma_local(view.lattice)
 
     by_concept_attrs: dict[str, list[str]] = {
         c.stable_id(): [] for c in view.lattice.concepts
@@ -526,9 +526,9 @@ def exploration_view_to_nested_data(
         c.stable_id(): [] for c in view.lattice.concepts
     }
 
-    for attr_idx, cid in gamma.items():
+    for attr_idx, cid in mu.items():
         by_concept_attrs[cid].append(view.context.attributes[attr_idx])
-    for obj_idx, cid in mu.items():
+    for obj_idx, cid in gamma.items():
         by_concept_objs[cid].append(view.context.objects[obj_idx])
 
     # Subdirect decomposition: shared inner template from the ⊤ outer concept.
@@ -537,13 +537,13 @@ def exploration_view_to_nested_data(
     template_view = view.children.get(top_id)
 
     inner_template = None
-    mu_by_name: dict[str, str] = {}
+    gamma_by_name: dict[str, str] = {}
     inner_scale_names: list[str] = []
     filled_by_outer: dict[str, set[str]] = {}
 
     if template_view is not None:
         tdata = _inner_template_data(template_view)
-        mu_by_name = tdata.pop("mu_by_name")
+        gamma_by_name = tdata.pop("gamma_by_name")
         inner_template = tdata
         inner_scale_names = list(template_view.scale_names)
 
@@ -568,8 +568,8 @@ def exploration_view_to_nested_data(
                 f"but the following attributes appear in both: {sorted(overlap)}"
             )
 
-        mu_inner = _mu_local(template_view.lattice)
-        filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice, mu, mu_inner)
+        gamma_inner = _gamma_local(template_view.lattice)
+        filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice, gamma, gamma_inner)
 
     _fmt_obj: Callable[[str], str] = object_label if object_label is not None else (lambda x: x)
 
@@ -616,9 +616,9 @@ def exploration_view_to_nested_data(
             for inode in inner_template["nodes"]:
                 iid = inode["id"]
                 # Object labels: objects introduced at THIS outer concept
-                # whose μ_inner maps to this inner template node.
+                # whose γ_inner maps to this inner template node.
                 obj_labels = sorted(
-                    _fmt_obj(g) for g in new_objs if mu_by_name.get(g) == iid
+                    _fmt_obj(g) for g in new_objs if gamma_by_name.get(g) == iid
                 )
 
                 # Match to per-concept view node by intent.
@@ -1195,7 +1195,7 @@ function goRoot() {{
 //
 // Draw the shared inner template inside an outer node bubble.
 // Nodes in `filledInner` are rendered filled (dark blue); all others hollow.
-// Attribute labels appear above each inner node where introduced (γ(m)).
+// Attribute labels appear above each inner node where introduced (μ(m)).
 // Object labels are omitted in the preview to avoid clutter.
 // ---------------------------------------------------------------------
 function drawTemplatePreview(parentGroup, innerTemplate, filledInner, radius, showAttrLabels) {{

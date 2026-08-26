@@ -7,10 +7,12 @@ check_transformer_preserve_dtypes — both always output bool by design.
 ConceptualScaler uses NominalScale(0), which resolves to source_attribute="x0".
 Generic numpy arrays are converted to ManyValuedContexts with synthesised column
 names x0, x1, ... so NominalScale(0) works with any 2D array.  The remaining
-xfails are:
+xfail is:
   - check_transformer_preserve_dtypes: always outputs bool (same as above)
-  - check_estimators_nan_inf: NaN is treated as a valid category value; the
-    scaler does not reject NaN input by design
+
+NaN is treated as a valid category value by design (not an error condition),
+so ConceptualScaler declares tags.input_tags.allow_nan = True; this makes
+check_estimators_nan_inf pass rather than xfail.
 """
 
 import pytest
@@ -34,14 +36,8 @@ _CLE_EXPECTED_FAILURES = {
     "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
 }
 
-_SCALER_NAN = (
-    "NaN is treated as a valid category value in FCA; the scaler does not "
-    "reject NaN input by design."
-)
-
 _SCALER_EXPECTED_FAILURES = {
     "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
-    "check_estimators_nan_inf": _SCALER_NAN,
 }
 
 
