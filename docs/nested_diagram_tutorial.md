@@ -80,8 +80,8 @@ for visual alignment across all outer nodes. The filled nodes at each outer posi
 you exactly which inner concepts co-occur with that outer concept in $\mathcal{B}(K)$.
 
 > **Key insight:** The nested diagram is a visual representation of the subdirect
-> embedding $\varphi$. Filled means "in $\operatorname{image}(\varphi)$"; hollow means
-> "not in $\operatorname{image}(\varphi)$".
+> embedding $\varphi$. Filled means "in $\mathrm{image}(\varphi)$"; hollow means
+> "not in $\mathrm{image}(\varphi)$".
 
 The central question — and the focus of the rest of this tutorial — is:
 **how do you efficiently compute which inner nodes are filled?**
@@ -119,7 +119,7 @@ Theorem 4.3).
 > The inner node $c_\text{inner}$ is drawn **filled** at outer node $c_\text{outer}$
 > in the nested diagram if and only if
 > $$
-> (c_\text{outer}, c_\text{inner}) \in \operatorname{image}(\varphi)
+> (c_\text{outer}, c_\text{inner}) \in \mathrm{image}(\varphi)
 > $$
 > i.e., there exists a concept $C \in \mathcal{B}(K)$ such that
 > $\varphi(C) = (c_\text{outer}, c_\text{inner})$.
@@ -151,11 +151,11 @@ knowledge of $\mathcal{B}(K)$ beyond the object concepts of each factor.
 > \text{ add } (c_o \vee c_o',\; c_i \vee c_i') \text{ to } P
 > $$
 >
-> **Result:** $P^* = \operatorname{image}(\varphi)$.
+> **Result:** $P^* = \mathrm{image}(\varphi)$.
 
 The join $c \vee c'$ in each factor lattice is the smallest concept whose extent contains
-$\operatorname{ext}(c) \cup \operatorname{ext}(c')$. Why this algorithm produces exactly
-$\operatorname{image}(\varphi)$ — no more and no less — is the content of Part 3.
+$\mathrm{ext}(c) \cup \mathrm{ext}(c')$. Why this algorithm produces exactly
+$\mathrm{image}(\varphi)$ — no more and no less — is the content of Part 3.
 
 The bottom pair $(\bot_\text{outer}, \bot_\text{inner})$ is added explicitly because
 $\bot_K$ has an empty extent, so no single object maps to it, yet it must be represented.
@@ -164,7 +164,7 @@ $\bot_K$ has an empty extent, so no single object maps to it, yet it must be rep
 
 ## 3. Why P\* = image(φ): The Core Theorem
 
-The equality $P^* = \operatorname{image}(\varphi)$ rests on two independent propositions.
+The equality $P^* = \mathrm{image}(\varphi)$ rests on two independent propositions.
 Together they give both containments.
 
 ### Proposition 1: every concept equals the join of its object concepts
@@ -173,19 +173,19 @@ Together they give both containments.
 >
 > For any concept $C \in \mathcal{B}(K)$:
 > $$
-> C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}
+> C = \bigvee\{\gamma(g) : g \in \mathrm{ext}(C)\}
 > $$
 
 > *Proof.*
-> Write $A = \operatorname{ext}(C)$. For each $g \in A$, the object concept $\gamma(g)$
+> Write $A = \mathrm{ext}(C)$. For each $g \in A$, the object concept $\gamma(g)$
 > is the smallest concept containing $g$. Since $C$ contains $g$, we have $\gamma(g) \leq C$
 > for all $g \in A$, so the join $J = \bigvee\{\gamma(g) : g \in A\}$ satisfies $J \leq C$.
 >
-> For the reverse: $\operatorname{ext}(J) = \bigl(\bigcup\{\operatorname{ext}(\gamma(g)) : g \in A\}\bigr)''$.
-> Since $g \in \operatorname{ext}(\gamma(g))$ for every $g$, we have
-> $A \subseteq \bigcup\{\operatorname{ext}(\gamma(g)) : g \in A\}$,
-> so $A'' \subseteq \operatorname{ext}(J)$. But $A'' = A$ because $A = \operatorname{ext}(C)$
-> is $K$-closed. Thus $A \subseteq \operatorname{ext}(J)$, meaning $C \leq J$.
+> For the reverse: $\mathrm{ext}(J) = \bigl(\bigcup\{\mathrm{ext}(\gamma(g)) : g \in A\}\bigr)''$.
+> Since $g \in \mathrm{ext}(\gamma(g))$ for every $g$, we have
+> $A \subseteq \bigcup\{\mathrm{ext}(\gamma(g)) : g \in A\}$,
+> so $A'' \subseteq \mathrm{ext}(J)$. But $A'' = A$ because $A = \mathrm{ext}(C)$
+> is $K$-closed. Thus $A \subseteq \mathrm{ext}(J)$, meaning $C \leq J$.
 >
 > Both inequalities give $C = J$. $\square$
 
@@ -204,17 +204,17 @@ Together they give both containments.
 > In the apposition $K = K_\text{outer} \mid K_\text{inner}$, the closure of a set of
 > objects under the outer attributes depends only on their outer incidences. Formally:
 > $$
-> \operatorname{ext}(\pi_\text{outer}(C_1 \vee C_2))
+> \mathrm{ext}(\pi_\text{outer}(C_1 \vee C_2))
 > = K_\text{outer}\text{-closure of }
->   \bigl(\operatorname{ext}(C_1) \cup \operatorname{ext}(C_2)\bigr)''_K
+>   \bigl(\mathrm{ext}(C_1) \cup \mathrm{ext}(C_2)\bigr)''_K
 > $$
 > The $K$-closure does not shrink a set below its $K_\text{outer}$-closure, so:
 > $$
 > K_\text{outer}\text{-closure of }
-> \bigl(\operatorname{ext}(C_1) \cup \operatorname{ext}(C_2)\bigr)''_K
+> \bigl(\mathrm{ext}(C_1) \cup \mathrm{ext}(C_2)\bigr)''_K
 > = K_\text{outer}\text{-closure of }
->   \bigl(\operatorname{ext}(C_1) \cup \operatorname{ext}(C_2)\bigr)
-> = \operatorname{ext}\bigl(\pi_\text{outer}(C_1) \vee \pi_\text{outer}(C_2)\bigr)
+>   \bigl(\mathrm{ext}(C_1) \cup \mathrm{ext}(C_2)\bigr)
+> = \mathrm{ext}\bigl(\pi_\text{outer}(C_1) \vee \pi_\text{outer}(C_2)\bigr)
 > $$
 > Therefore $\pi_\text{outer}(C_1 \vee C_2) = \pi_\text{outer}(C_1) \vee \pi_\text{outer}(C_2)$.
 > The argument for the inner projection is symmetric. $\square$
@@ -223,28 +223,28 @@ Together they give both containments.
 
 > **Main Theorem**
 >
-> The join-closure $P^*$ of the seed set $P_0$ equals $\operatorname{image}(\varphi)$.
+> The join-closure $P^*$ of the seed set $P_0$ equals $\mathrm{image}(\varphi)$.
 
 > *Proof — two containments.*
 >
-> **$P^* \subseteq \operatorname{image}(\varphi)$.**
+> **$P^* \subseteq \mathrm{image}(\varphi)$.**
 > The seed set $P_0$ consists of pairs $\varphi(\gamma(g))$ and $\varphi(\bot_K)$, all lying
-> in $\operatorname{image}(\varphi)$. The join-closure adds joins of existing pairs. By
-> Proposition 2, any join of pairs in $\operatorname{image}(\varphi)$ is again in
-> $\operatorname{image}(\varphi)$. By induction, $P^* \subseteq \operatorname{image}(\varphi)$.
+> in $\mathrm{image}(\varphi)$. The join-closure adds joins of existing pairs. By
+> Proposition 2, any join of pairs in $\mathrm{image}(\varphi)$ is again in
+> $\mathrm{image}(\varphi)$. By induction, $P^* \subseteq \mathrm{image}(\varphi)$.
 >
-> **$\operatorname{image}(\varphi) \subseteq P^*$.**
+> **$\mathrm{image}(\varphi) \subseteq P^*$.**
 > Take any $C \in \mathcal{B}(K)$. By Proposition 1,
-> $C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}$. Applying $\varphi$ and
+> $C = \bigvee\{\gamma(g) : g \in \mathrm{ext}(C)\}$. Applying $\varphi$ and
 > Proposition 2:
 > $$
 > \varphi(C)
-> = \bigvee\{\varphi(\gamma(g)) : g \in \operatorname{ext}(C)\}
+> = \bigvee\{\varphi(\gamma(g)) : g \in \mathrm{ext}(C)\}
 > = \bigvee\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g))
->            : g \in \operatorname{ext}(C)\}
+>            : g \in \mathrm{ext}(C)\}
 > \in P^*
 > $$
-> The second equality uses the bridging lemma (Part 4). If $\operatorname{ext}(C) = \emptyset$
+> The second equality uses the bridging lemma (Part 4). If $\mathrm{ext}(C) = \emptyset$
 > then $C = \bot_K$ and $\varphi(\bot_K) = (\bot_\text{outer}, \bot_\text{inner})
 > \in P_0 \subseteq P^*$. $\square$
 
@@ -252,7 +252,7 @@ Together they give both containments.
 
 ## 4. The Bridging Lemma: Why K Is Never Needed
 
-Parts 2 and 3 established that $P^* = \operatorname{image}(\varphi)$ when the seed pairs
+Parts 2 and 3 established that $P^* = \mathrm{image}(\varphi)$ when the seed pairs
 are $\{(\pi_\text{outer}(\gamma_K(g)),\; \pi_\text{inner}(\gamma_K(g))) : g \in G\}$.
 Computing these seeds naïvely requires knowing the object concepts $\gamma_K(g)$ inside
 $\mathcal{B}(K)$, which requires building $K$.
@@ -288,7 +288,7 @@ implementation enforces this with a runtime `ValueError`.
 
 > *Proof (outer projection; inner is symmetric).*
 >
-> Let $A = \operatorname{ext}(\gamma_K(g)) = \{g\}''_K$. We need to show that the
+> Let $A = \mathrm{ext}(\gamma_K(g)) = \{g\}''_K$. We need to show that the
 > $K_\text{outer}$-closure of $A$ equals $\{g\}''_{K_\text{outer}}$.
 >
 > **Step 1.** $A \subseteq \{g\}''_{K_\text{outer}}$. Any $h \in A$ shares all of $g$'s
@@ -304,7 +304,7 @@ implementation enforces this with a runtime `ValueError`.
 > = \{g\}''_{K_\text{outer}}
 > $$
 > So $A''_{K_\text{outer}} = \{g\}''_{K_\text{outer}}$, i.e.,
-> $\operatorname{ext}(\pi_\text{outer}(\gamma_K(g))) = \operatorname{ext}(\gamma_{K_\text{outer}}(g))$.
+> $\mathrm{ext}(\pi_\text{outer}(\gamma_K(g))) = \mathrm{ext}(\gamma_{K_\text{outer}}(g))$.
 > $\square$
 
 ### Consequence
@@ -320,7 +320,7 @@ Both $\gamma_{K_\text{outer}}(g)$ and $\gamma_{K_\text{inner}}(g)$ are computed 
 the factor lattices, without ever constructing $K$ or $\mathcal{B}(K)$.
 
 > **Key insight:** The bridging lemma is the keystone. Part 3 proved that
-> $\operatorname{image}(\varphi) = $ join-closure of $\{\varphi(\gamma_K(g))\}$. The
+> $\mathrm{image}(\varphi) = $ join-closure of $\{\varphi(\gamma_K(g))\}$. The
 > bridging lemma proves that $\varphi(\gamma_K(g)) = (\gamma_{K_\text{outer}}(g),\,
 > \gamma_{K_\text{inner}}(g))$, making the whole computation factor-local. The combined
 > context $K$ is an abstract object referenced in the proof but never materialised
@@ -492,7 +492,7 @@ In any concept lattice, the join of two concepts in terms of their intents is th
 *intersection*:
 
 $$
-\operatorname{int}(C_1 \vee C_2) = \operatorname{int}(C_1) \cap \operatorname{int}(C_2)
+\mathrm{int}(C_1 \vee C_2) = \mathrm{int}(C_1) \cap \mathrm{int}(C_2)
 $$
 
 Larger intents (more constraints) correspond to smaller concepts lower in the lattice.
@@ -536,8 +536,8 @@ this subset, since Nemo has all 4 outer and all 3 inner attributes):
 
 ### Selected join steps — Round 1
 
-We join each pair of seeds using $\operatorname{int}(C_1 \vee C_2) =
-\operatorname{int}(C_1) \cap \operatorname{int}(C_2)$, applied independently to each
+We join each pair of seeds using $\mathrm{int}(C_1 \vee C_2) =
+\mathrm{int}(C_1) \cap \mathrm{int}(C_2)$, applied independently to each
 component.
 
 **Nicole ⊔ Linda Martin** → outer: `{p,h} ∩ {r,c,h}` = `{h}`, inner: `{a,m} ∩ ∅` = `∅`
@@ -595,7 +595,7 @@ The achievable inner intents in this subset are exactly `{a,b,m}`, `{a,b}`, `{a,
 
 > **Result:** Starting from 9 seed pairs, the join-closure algorithm terminates with
 > **34 filled pairs**. These 34 pairs represent the complete subdirect product
-> $\operatorname{image}(\varphi)$ — i.e., the 34 concepts of $\mathcal{B}(K)$ for this
+> $\mathrm{image}(\varphi)$ — i.e., the 34 concepts of $\mathcal{B}(K)$ for this
 > 9-winner subset.
 
 ### What 34 pairs means for the diagram
@@ -620,18 +620,18 @@ Here is how you would re-derive the algorithm from scratch, starting only from t
 
 We want to compute, for each pair $(c_\text{outer}, c_\text{inner})$, whether a concept
 $C \in \mathcal{B}(K)$ exists with $\pi_\text{outer}(C) = c_\text{outer}$ and
-$\pi_\text{inner}(C) = c_\text{inner}$. This is exactly $\operatorname{image}(\varphi)$.
+$\pi_\text{inner}(C) = c_\text{inner}$. This is exactly $\mathrm{image}(\varphi)$.
 
 ### Step 2: notice that φ is a lattice homomorphism
 
 $\varphi$ maps concepts to coordinate pairs and respects joins (Proposition 2). So
-$\operatorname{image}(\varphi)$ is closed under joins — it is a sublattice. Any set
+$\mathrm{image}(\varphi)$ is closed under joins — it is a sublattice. Any set
 of generators under join-closure generates exactly that sublattice.
 
 ### Step 3: find the generators
 
-By Proposition 1, every concept $C = \bigvee\{\gamma(g) : g \in \operatorname{ext}(C)\}$.
-So $\varphi(C) = \bigvee\{\varphi(\gamma(g)) : g \in \operatorname{ext}(C)\}$. The entire
+By Proposition 1, every concept $C = \bigvee\{\gamma(g) : g \in \mathrm{ext}(C)\}$.
+So $\varphi(C) = \bigvee\{\varphi(\gamma(g)) : g \in \mathrm{ext}(C)\}$. The entire
 image is generated by the *atomic pairs* $\{\varphi(\gamma(g)) : g \in G\}$ plus the
 bottom pair.
 
@@ -644,7 +644,7 @@ factor object concepts are computable from the factor lattices alone.
 ### Step 5: the algorithm falls out
 
 $$
-\operatorname{image}(\varphi)
+\mathrm{image}(\varphi)
 = \text{join-closure of }
 \bigl\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\bigr\}
 \cup \{(\bot, \bot)\}
@@ -664,7 +664,7 @@ joins are computable from the factor lattices.
 Seed the set $P$ with one coordinate pair per object — the pair of factor-lattice object
 concepts — plus the explicit bottom pair. Then repeatedly join any two pairs in $P$
 componentwise and add the result to $P$ until no new pairs appear. This fixpoint is
-exactly $\operatorname{image}(\varphi) = \mathcal{B}(K)$, encoded as pairs of concept
+exactly $\mathrm{image}(\varphi) = \mathcal{B}(K)$, encoded as pairs of concept
 IDs from the two factor lattices. The nested diagram fills inner node $c_\text{inner}$
 at outer node $c_\text{outer}$ iff the pair $(c_\text{outer}, c_\text{inner})$ is in $P$.
 
@@ -686,16 +686,16 @@ every concept in $\mathcal{B}(K)$ is represented by exactly one filled node.
 
 A hollow node at $(c_\text{outer}, c_\text{inner})$ means the opposite: **no concept
 $C \in \mathcal{B}(K)$ projects to this pair**. Equivalently, the combined attribute set
-$\operatorname{int}(c_\text{outer}) \cup \operatorname{int}(c_\text{inner})$ is not a
+$\mathrm{int}(c_\text{outer}) \cup \mathrm{int}(c_\text{inner})$ is not a
 closed set in $K$ — its closure strictly contains it.
 
 Why would the closure be larger? Because there is an **implication** in $K$ that fires.
 Specifically, there exists an implication $P \to Q$ (with $P \not\to Q$ being false in
 $K$) such that:
 $$
-P \subseteq \operatorname{int}(c_\text{outer}) \cup \operatorname{int}(c_\text{inner})
+P \subseteq \mathrm{int}(c_\text{outer}) \cup \mathrm{int}(c_\text{inner})
 \quad \text{but} \quad
-Q \not\subseteq \operatorname{int}(c_\text{outer}) \cup \operatorname{int}(c_\text{inner})
+Q \not\subseteq \mathrm{int}(c_\text{outer}) \cup \mathrm{int}(c_\text{inner})
 $$
 
 The premise $P$ is satisfied by the combined attributes of that node, but the conclusion
