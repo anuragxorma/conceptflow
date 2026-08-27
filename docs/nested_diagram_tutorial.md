@@ -312,8 +312,8 @@ implementation enforces this with a runtime `ValueError`.
 By the bridging lemma, the seed set of the join-closure algorithm becomes:
 
 $$
-P_0 = \bigl\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\bigr\}
-      \cup \bigl\{(\bot_\text{outer},\; \bot_\text{inner})\bigr\}
+P_0 = \{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\}
+      \cup \{(\bot_\text{outer},\; \bot_\text{inner})\}
 $$
 
 Both $\gamma_{K_\text{outer}}(g)$ and $\gamma_{K_\text{inner}}(g)$ are computed directly from
@@ -646,7 +646,7 @@ factor object concepts are computable from the factor lattices alone.
 $$
 \mathrm{image}(\varphi)
 = \text{join-closure of }
-\bigl\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\bigr\}
+\{(\gamma_{K_\text{outer}}(g),\; \gamma_{K_\text{inner}}(g)) : g \in G\}
 \cup \{(\bot, \bot)\}
 $$
 
