@@ -19,7 +19,11 @@ To install from source instead (e.g. for development):
 ```bash
 git clone https://github.com/anuragxorma/conceptflow
 cd conceptflow
-pip install -e ".[dev]"
+uv sync   # creates .venv, installs the project editable + dev tools (pytest, ruff)
+
+# run anything inside the managed environment
+uv run pytest
+uv run python examples/basic_lattice.py
 ```
 
 ### Java requirement for nested diagrams
