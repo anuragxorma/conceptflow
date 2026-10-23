@@ -74,9 +74,9 @@ def test_plot_lattice_dimflux_layout_returns_graph_data_with_coordinates():
 
 def test_lattice_to_graph_data_dimflux_handles_multi_word_names():
     # Object/attribute names with spaces (and words that collide with
-    # Python/sympy keywords, e.g. "in") used to break DimFlux: the JAR's
-    # text output and several sympy symbol expressions join names with
-    # plain whitespace and no escaping. Regression test for that bug.
+    # Python keywords, e.g. "in") broke the previously vendored DimFlux.
+    # Names are replaced by synthetic ones before calling DimFlux; this
+    # guards that path.
     ctx = FormalContext.from_array(
         np.array([
             [1, 1, 0],
@@ -99,3 +99,63 @@ def test_lattice_to_graph_data_dimflux_handles_multi_word_names():
     # sanitizing names for DimFlux internally must not leak into labels.
     all_labels = " ".join(node.label for node in graph_data.nodes)
     assert "lives in water" in all_labels or "needs chlorophyll" in all_labels or "can move" in all_labels
+
+
+def test_dimflux_handles_object_and_attribute_sharing_a_name():
+    # DimFlux rejects duplicate names; ConceptFlow allows an object and an
+    # attribute to share one.
+    ctx = FormalContext.from_array(
+        np.array([[1, 0], [1, 1]]),
+        objects=["x", "y"],
+        attributes=["x", "z"],
+    )
+
+    graph_data = lattice_to_graph_data_dimflux(ConceptLattice.from_context(ctx))
+
+    assert all(node.x is not None for node in graph_data.nodes)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        np.array([[1, 1]]),  # single concept
+        np.zeros((3, 0)),  # no attributes
+        np.zeros((0, 2)),  # no objects
+    ],
+)
+def test_dimflux_handles_degenerate_lattices(data):
+    lattice = ConceptLattice.from_context(FormalContext.from_array(data))
+
+    graph_data = lattice_to_graph_data_dimflux(lattice)
+
+    assert len(graph_data.nodes) == lattice.n_concepts == 1
+    assert (graph_data.nodes[0].x, graph_data.nodes[0].y) == (0.0, 0.0)
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_dimflux_coordinates_are_mapped_to_the_right_concepts(seed):
+    # DimFlux drawings are additive with upward vectors, so in a correct
+    # concept-to-coordinate mapping every cover edge points the same way.
+    # A mix-up between concepts would almost surely break this.
+    rng = np.random.default_rng(seed)
+    lattice = ConceptLattice.from_context(
+        FormalContext.from_array(rng.random((8, 6)) < 0.5)
+    )
+
+    graph_data = lattice_to_graph_data_dimflux(lattice)
+    nodes = graph_data.node_map()
+
+    for edge in graph_data.edges:
+        # Screen coordinates: the upper concept has the smaller y.
+        assert nodes[edge.target].y < nodes[edge.source].y
+
+    positions = {(node.x, node.y) for node in graph_data.nodes}
+    assert len(positions) == lattice.n_concepts
+
+
+def test_plot_lattice_passes_timeout_to_dimflux():
+    graph_data = plot_lattice(
+        make_lattice(), backend="graph_data", layout="dimflux", timeout_ms=200
+    )
+
+    assert all(node.x is not None for node in graph_data.nodes)

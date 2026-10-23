@@ -94,3 +94,25 @@ def implication_confidence(
     )
 
     return combined_support / premise_support
+
+def implication_exceptions(
+    context: FormalContext,
+    premise: Iterable[int | str],
+    conclusion: Iterable[int | str],
+) -> frozenset[int]:
+    """
+    Return the objects that violate the implication premise -> conclusion.
+
+    These are the objects having every premise attribute but lacking at
+    least one conclusion attribute. The implication holds exactly in the
+    context iff the result is empty.
+
+    Attributes may be given as indices or names; object indices are returned.
+    """
+    premise = frozenset(premise)
+    conclusion = frozenset(conclusion)
+
+    premise_extent = context.attribute_derivation(premise)
+    combined_extent = context.attribute_derivation(premise | conclusion)
+
+    return premise_extent - combined_extent

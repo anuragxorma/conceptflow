@@ -104,9 +104,11 @@ This means there exists a concept C ∈ B(K) such that π_outer(C) = c_outer and
 ### Implementation
 
 The implementation computes the same set without building B(K) or evaluating φ.
-Instead it uses the join-closure of object-level coordinate pairs, described in
-Sections 4–5.  Correctness of this shortcut depends on the bridging lemma in
-Section 4.
+For every pair (c_outer, c_inner) it intersects the two extents and checks that
+the result derives back to exactly intent(c_outer) in K_outer and exactly
+intent(c_inner) in K_inner — i.e. that intent(c_outer) ∪ intent(c_inner) is an
+intent of K.  Sections 4–5 describe the equivalent join-closure construction,
+which `debug_filled_pairs` still uses to explain where each pair comes from.
 
 ---
 
@@ -187,9 +189,9 @@ of φ equals the join-closure of {φ(γ(g)) : g ∈ G} ∪ {φ(⊥_K)}.
 
 ### Implementation
 
-The code applies the join-closure directly in the factor lattices using the
-atomic pairs from Section 4 in place of {φ(γ(g))}.  This is valid by the
-bridging lemma:
+The join-closure can be applied directly in the factor lattices using the
+atomic pairs from Section 4 in place of {φ(γ(g))} (this is what
+`debug_filled_pairs` does).  This is valid by the bridging lemma:
 
 ```
 if (c_o, c_i), (c_o′, c_i′) ∈ P  then add  (c_o ∨ c_o′,  c_i ∨ c_i′)  to P
@@ -244,9 +246,9 @@ projecting to that outer coordinate.
 
 **What the implementation does not do.** It never enumerates B(K), never
 evaluates φ on a concept, and never forms the combined context K.  It computes
-P* = image(φ) purely from the two factor lattices via the join-closure algorithm,
-relying on the bridging lemma (Section 4) to connect factor-level quantities to
-the abstract embedding.  The result is mathematically identical to the G&W
+P* = image(φ) purely from the two factor lattices and their contexts, with a
+direct per-pair closedness test (`conceptflow.exploration.realized_pairs`) that
+gives the same set as the join-closure algorithm.  The result is mathematically identical to the G&W
 diagram; the path to reach it is different.
 
 ---

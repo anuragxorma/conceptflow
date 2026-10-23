@@ -78,6 +78,16 @@ class Scale(ABC):
         """
         raise NotImplementedError
 
+    def domain(self, mvc) -> list[Any] | None:
+        """
+        Return every value this scale can encode, or None if that set is
+        open (e.g. numeric thresholds).
+
+        ``ConceptualScaler(missing="unknown")`` uses it to tell which binary
+        attributes a missing value must or cannot have.
+        """
+        return None
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(source_attribute={self.source_attribute!r})"
 
@@ -98,6 +108,9 @@ class NominalScale(Scale):
     def binary_attributes(self, mvc) -> list[str]:
         values = sorted(mvc.unique_values(self.source_attribute), key=str)
         return [f"{self.source_attribute}={value}" for value in values]
+
+    def domain(self, mvc) -> list[Any]:
+        return sorted(mvc.unique_values(self.source_attribute), key=str)
 
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         """
@@ -140,6 +153,9 @@ class ContranominalScale(Scale):
     def binary_attributes(self, mvc) -> list[str]:
         values = sorted(mvc.unique_values(self.source_attribute), key=str)
         return [f"{self.source_attribute}!={value}" for value in values]
+
+    def domain(self, mvc) -> list[Any]:
+        return sorted(mvc.unique_values(self.source_attribute), key=str)
 
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         """
@@ -193,6 +209,9 @@ class DichotomicScale(Scale):
             f"{self.source_attribute}={self.true_value}",
             f"{self.source_attribute}={self.false_value}",
         ]
+
+    def domain(self, mvc) -> list[Any]:
+        return [self.true_value, self.false_value]
 
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         if value not in {self.true_value, self.false_value}:
@@ -257,6 +276,9 @@ class OrdinalScale(Scale):
             return [f"{self.source_attribute}<={level}" for level in self.levels]
 
         return [f"{self.source_attribute}={level}" for level in self.levels]
+
+    def domain(self, mvc) -> list[Any]:
+        return list(self.levels)
 
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         if value not in self._rank:
@@ -368,6 +390,9 @@ class InterordinalScale(Scale):
         upper = [f"{self.source_attribute}>={level}" for level in self.levels]
         return lower + upper
 
+    def domain(self, mvc) -> list[Any]:
+        return list(self.levels)
+
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         if value not in self._rank:
             raise ValueError(
@@ -450,6 +475,9 @@ class GeneralScale(Scale):
 
     def binary_attributes(self, mvc) -> list[str]:
         return list(self.attribute_order)
+
+    def domain(self, mvc) -> list[Any]:
+        return list(self.mapping)
 
     def encode_value(self, value: Any, mvc) -> dict[str, bool]:
         if value not in self.mapping:

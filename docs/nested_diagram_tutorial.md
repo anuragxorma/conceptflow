@@ -389,7 +389,7 @@ The concept with the smallest extent containing $g$ is exactly $\gamma(g)$ by de
 the object concept is the most specific concept that still has $g$ in scope. The real
 function computes this for every object in the lattice at once, keyed by object index.
 
-### _compute_filled_pairs: the join-closure loop
+### The join-closure loop
 
 ```python
 def _compute_filled_pairs(
@@ -444,9 +444,13 @@ def _compute_filled_pairs(
     return result
 ```
 
-This is the real implementation from `src/conceptflow/visualization/nested.py`,
-reproduced verbatim (the gamma dicts are computed once by `_gamma_local` and
-passed in, rather than recomputed inside this function).
+This is how ConceptFlow originally computed the filled pairs, and it is still
+what `debug_filled_pairs` reproduces with provenance. `plot_nested` now uses
+`conceptflow.exploration.realized_pairs`, which checks each pair directly: a pair
+$(c, d)$ is filled iff $(A_c \cap A_d)'$ is exactly $B_c \cup B_d$, i.e. iff
+$B_c \cup B_d$ is an intent of the combined context. That gives the same set of
+pairs without the quadratic fixpoint loop. `nested_combinations(view)` returns
+these pairs, filled and hollow, as a DataFrame.
 
 ### Why the object ordering matters
 

@@ -7,14 +7,14 @@ using explicit conceptual scale definitions.
 
 from __future__ import annotations
 
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted
-
 import numpy as np
 import pandas as pd
 from scipy import sparse
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.utils.validation import check_is_fitted
 
-from conceptflow.core import FormalContext, ManyValuedContext
+from conceptflow.core import FormalContext, IncompleteContext, ManyValuedContext
+from conceptflow.core.incomplete_context import is_missing
 from conceptflow.preprocessing.scales import Scale
 
 
@@ -34,11 +34,34 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
         - "sparse": scipy sparse CSR matrix
         - "context": FormalContext (FCA domain object; not pipeline-compatible
           unless the next step also accepts FormalContext)
+
+    missing:
+        How to scale a missing value (None, NaN, NaT, ``pd.NA`` or the
+        string ``"?"``) of a scaled attribute:
+
+        - "error": raise a ValueError (default). Missing values are never
+          silently turned into crosses or non-crosses.
+        - "false": the object gets none of that scale's binary attributes
+          (closed-world assumption on the *binary* attributes). Note that
+          for scales whose attributes are negative statements, such as
+          ContranominalScale ("x!=v") or OrdinalScale(mode="le"), "none of
+          the attributes" places the object at the bottom of that scale.
+        - "unknown": a binary attribute is known-yes if it holds for every
+          value the scale can take, known-no if it holds for none, and
+          unknown otherwise (ThresholdScale has an open domain, so all its
+          attributes become unknown). Outputs become three-valued:
+          "context" returns an IncompleteContext, while "array" and
+          "dataframe" return floats (1.0 / 0.0, NaN for unknown), the
+          scikit-learn convention for missing values. "sparse" output is not supported in this mode.
+          Unknown entries are independent of each other, so implications
+          that follow from a scale itself (e.g. ``size>=L -> size>=M``) can
+          be reported as "possible" by ``IncompleteContext.implication_status``.
     """
 
-    def __init__(self, scales=None, output: str = "array"):
+    def __init__(self, scales=None, output: str = "array", missing: str = "error"):
         self.scales = scales
         self.output = output
+        self.missing = missing
 
     def fit(self, X, y=None):
         """
@@ -65,10 +88,11 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
                     f'"{scale.source_attribute}".'
                 )
 
-        if self.output not in {"context", "dataframe", "array", "sparse"}:
-            raise ValueError(
-                'output must be one of "context", "dataframe", "array", or "sparse".'
-            )
+        self._validate_output_params()
+
+        if self.missing == "error":
+            for scale in self.scales:
+                self._check_no_missing(mvc, scale.source_attribute)
 
         self.input_context_ = mvc
         self.scales_ = list(self.scales)
@@ -79,11 +103,34 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         return self
 
+    def __setstate__(self, state):
+        # Scalers pickled before the ``missing`` parameter existed (0.1.x)
+        # behave like the current default.
+        state.setdefault("missing", "error")
+        super().__setstate__(state)
+
+    def _validate_output_params(self) -> None:
+        if self.output not in {"context", "dataframe", "array", "sparse"}:
+            raise ValueError(
+                'output must be one of "context", "dataframe", "array", or "sparse".'
+            )
+
+        if self.missing not in {"error", "false", "unknown"}:
+            raise ValueError('missing must be one of "error", "false", or "unknown".')
+
+        if self.missing == "unknown" and self.output == "sparse":
+            raise ValueError(
+                'output="sparse" cannot represent unknown entries; use '
+                'missing="unknown" with "context", "dataframe" or "array".'
+            )
+
     def transform(self, X):
         """
         Apply conceptual scaling.
         """
         check_is_fitted(self, "scales_")
+        # Parameters may have been changed with set_params() after fit.
+        self._validate_output_params()
 
         mvc = self._to_many_valued_context(X)
 
@@ -95,6 +142,19 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         binary_df = self._scale_to_dataframe(mvc)
 
+        if self.missing == "unknown":
+            if self.output == "context":
+                return IncompleteContext.from_dataframe(binary_df)
+
+            # 1.0 / 0.0 / NaN: scikit-learn's convention for missing values.
+            # (Nullable-boolean frames break sklearn's numeric helpers.)
+            values = binary_df.astype("Float64").to_numpy(dtype=float, na_value=np.nan)
+
+            if self.output == "array":
+                return values
+
+            return pd.DataFrame(values, index=binary_df.index, columns=binary_df.columns)
+
         if self.output == "dataframe":
             return binary_df
 
@@ -105,6 +165,21 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
             return sparse.csr_matrix(binary_df.values, dtype=bool)
 
         return FormalContext.from_dataframe(binary_df)
+
+    @staticmethod
+    def _check_no_missing(mvc: ManyValuedContext, attribute: str) -> None:
+        column = mvc.column(attribute)
+        missing_objects = list(column.index[column.map(is_missing).astype(bool)])
+
+        if missing_objects:
+            shown = ", ".join(map(repr, missing_objects[:5]))
+            more = "" if len(missing_objects) <= 5 else f" and {len(missing_objects) - 5} more"
+            raise ValueError(
+                f'Input contains NaN: attribute "{attribute}" has missing values for objects '
+                f"{shown}{more}. Pass missing=\"false\" to treat them as having "
+                "none of the scale's attributes, or missing=\"unknown\" to keep "
+                "them as unknown entries (IncompleteContext)."
+            )
 
     def _to_many_valued_context(self, X) -> ManyValuedContext:
         if isinstance(X, ManyValuedContext):
@@ -181,17 +256,30 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
         self,
         obj: str,
         mvc: ManyValuedContext,
-    ) -> dict[str, bool]:
-        binary_row: dict[str, bool] = {}
+    ) -> dict[str, bool | None]:
+        binary_row: dict[str, bool | None] = {}
 
         for scale in self.scales_:
             value = mvc.get_value(obj, scale.source_attribute)
-            # Vocabulary is always resolved from the fit-time context, even
-            # when scaling transform-time data, so scales whose binary
-            # attributes are derived from observed values (NominalScale,
-            # ContranominalScale) stay fixed between fit and transform
-            # instead of silently drifting with whatever data is passed in.
-            encoded = scale.encode_value(value, self.input_context_)
+
+            if is_missing(value):
+                if self.missing == "error":
+                    self._check_no_missing(mvc, scale.source_attribute)
+
+                if self.missing == "false":
+                    encoded = {
+                        attr: False
+                        for attr in scale.binary_attributes(self.input_context_)
+                    }
+                else:
+                    encoded = self._unknown_encoding(scale)
+            else:
+                # Vocabulary is always resolved from the fit-time context, even
+                # when scaling transform-time data, so scales whose binary
+                # attributes are derived from observed values (NominalScale,
+                # ContranominalScale) stay fixed between fit and transform
+                # instead of silently drifting with whatever data is passed in.
+                encoded = scale.encode_value(value, self.input_context_)
 
             overlap = set(binary_row) & set(encoded)
             if overlap:
@@ -203,6 +291,28 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
             binary_row.update(encoded)
 
         return binary_row
+
+    def _unknown_encoding(self, scale: Scale) -> dict[str, bool | None]:
+        """
+        Encode a missing value as three-valued attributes.
+
+        An attribute that holds for every value in the scale's domain is
+        known-yes, one that holds for none is known-no, and the rest are
+        unknown. Without a finite domain everything is unknown.
+        """
+        attributes = scale.binary_attributes(self.input_context_)
+        domain = scale.domain(self.input_context_)
+
+        if not domain:
+            return {attr: None for attr in attributes}
+
+        encodings = [scale.encode_value(value, self.input_context_) for value in domain]
+
+        result: dict[str, bool | None] = {}
+        for attr in attributes:
+            values = {bool(encoding[attr]) for encoding in encodings}
+            result[attr] = values.pop() if len(values) == 1 else None
+        return result
 
     def _scale_to_dataframe(self, mvc: ManyValuedContext) -> pd.DataFrame:
         data = []
@@ -216,12 +326,17 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
             data,
             index=mvc.objects,
             columns=self.scaled_attributes_,
-            dtype=bool,
+            dtype="boolean" if self.missing == "unknown" else bool,
         )
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
-        tags.input_tags.allow_nan = True
+        tags.input_tags.allow_nan = self.missing != "error"
+        # Many-valued data is routinely categorical (strings).
+        tags.input_tags.string = True
+        # Outputs are boolean membership indicators (or 0/1/NaN floats),
+        # whatever the input dtype; tell sklearn not to expect preservation.
+        tags.transformer_tags.preserves_dtype = []
         return tags
 
     def get_feature_names_out(self, input_features=None):

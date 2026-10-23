@@ -33,6 +33,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from conceptflow.exploration.combinations import realized_pairs
 from conceptflow.exploration.view import ExplorationView
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.html_figure import HTMLFigure
@@ -58,7 +59,10 @@ def _gamma_local(lattice) -> dict[int, str]:
     return result
 
 
-def _inner_template_data(template_view: ExplorationView) -> dict[str, Any]:
+def _inner_template_data(
+    template_view: ExplorationView,
+    timeout_ms: int | None = 1000,
+) -> dict[str, Any]:
     """
     Build the shared inner template from the ⊤ outer concept's child view.
 
@@ -69,7 +73,9 @@ def _inner_template_data(template_view: ExplorationView) -> dict[str, Any]:
     outer concept we are currently at (γ_outer) and are injected per outer
     concept when building the synthetic click-through child view.
     """
-    inner_gd = lattice_to_graph_data_dimflux(template_view.lattice, stable_ids=True)
+    inner_gd = lattice_to_graph_data_dimflux(
+        template_view.lattice, stable_ids=True, timeout_ms=timeout_ms
+    )
 
     mu_inner = _mu_local(template_view.lattice)
     gamma_inner_idx = _gamma_local(template_view.lattice)  # obj_idx → stable_id
@@ -112,70 +118,21 @@ def _inner_template_data(template_view: ExplorationView) -> dict[str, Any]:
 def _compute_filled_pairs(
     outer_lattice,
     inner_lattice,
-    gamma_outer: dict[int, str],
-    gamma_inner: dict[int, str],
 ) -> dict[str, set[str]]:
     """
     Compute filled (outer_id, inner_id) coordinate pairs of the subdirect product.
 
     A pair is filled iff it is the projection of some concept in B(K) — the full
-    combined lattice — onto the two factor lattices.  By the join-generation
-    theorem this equals the join-closure (in the direct product B(K_outer) ×
-    B(K_inner)) of the atomic pairs {(γ_outer(g), γ_inner(g)) : g ∈ G} together
-    with the bottom pair (⊥_outer, ⊥_inner).
+    combined lattice — onto the two factor lattices. See
+    ``conceptflow.exploration.realized_pairs``, which checks this directly per
+    pair; it agrees with the join-closure of the atomic pairs
+    {(γ_outer(g), γ_inner(g)) : g ∈ G} used by ``debug_filled_pairs``.
 
     Returns: outer concept stable_id → set of filled inner concept stable_ids.
     """
-    outer_concepts = list(outer_lattice.concepts)
-    inner_concepts = list(inner_lattice.concepts)
-
-    outer_ext: dict[str, frozenset] = {c.stable_id(): c.extent for c in outer_concepts}
-    inner_ext: dict[str, frozenset] = {c.stable_id(): c.extent for c in inner_concepts}
-
-    def _lat_join(ext_by_id: dict, concept_list: list, id1: str, id2: str) -> str:
-        # Join = smallest concept whose extent ⊇ extent(id1) ∪ extent(id2).
-        combined = ext_by_id[id1] | ext_by_id[id2]
-        best = None
-        for c in concept_list:
-            if combined <= c.extent and (best is None or len(c.extent) < len(best.extent)):
-                best = c
-        return best.stable_id()
-
-    def outer_join(id1: str, id2: str) -> str:
-        return _lat_join(outer_ext, outer_concepts, id1, id2)
-
-    def inner_join(id1: str, id2: str) -> str:
-        return _lat_join(inner_ext, inner_concepts, id1, id2)
-
-    # Atomic coordinate pairs — one per object.
-    pairs: set[tuple[str, str]] = set()
-    for obj_idx, oid in gamma_outer.items():
-        iid = gamma_inner.get(obj_idx)
-        if iid is not None:
-            pairs.add((oid, iid))
-
-    # ⊥_K projects to (⊥_outer, ⊥_inner).
-    bot_outer = min(outer_concepts, key=lambda c: len(c.extent)).stable_id()
-    bot_inner = min(inner_concepts, key=lambda c: len(c.extent)).stable_id()
-    pairs.add((bot_outer, bot_inner))
-
-    # Close under componentwise joins until fixpoint.
-    changed = True
-    while changed:
-        changed = False
-        pairs_list = list(pairs)
-        for i in range(len(pairs_list)):
-            for j in range(i + 1, len(pairs_list)):
-                o1, i1 = pairs_list[i]
-                o2, i2 = pairs_list[j]
-                new_pair = (outer_join(o1, o2), inner_join(i1, i2))
-                if new_pair not in pairs:
-                    pairs.add(new_pair)
-                    changed = True
-
     result: dict[str, set[str]] = {}
-    for oid, iid in pairs:
-        result.setdefault(oid, set()).add(iid)
+    for outer, inner in realized_pairs(outer_lattice, inner_lattice):
+        result.setdefault(outer.stable_id(), set()).add(inner.stable_id())
     return result
 
 
@@ -496,6 +453,8 @@ def debug_bottom_outer(view: ExplorationView) -> None:
 def exploration_view_to_nested_data(
     view: ExplorationView,
     object_label: Callable[[str], str] | None = None,
+    timeout_ms: int | None = 1000,
+    max_depth: int | None = None,
 ) -> dict[str, Any]:
     """
     Convert an ExplorationView tree into nested JSON-like data, recursively.
@@ -512,8 +471,15 @@ def exploration_view_to_nested_data(
     child view (built from the restricted object set) using intent-based lookup:
     attribute indices are invariant across views built from the same scale, so
     a concept's intent frozenset is a reliable cross-view key.
+
+    ``timeout_ms`` is passed to every DimFlux layout. ``max_depth`` limits how
+    many nesting levels below ``view`` are built (``None``: all); each level
+    costs one DimFlux layout per expanded concept.
     """
-    graph_data = lattice_to_graph_data_dimflux(view.lattice, stable_ids=True)
+    graph_data = lattice_to_graph_data_dimflux(
+        view.lattice, stable_ids=True, timeout_ms=timeout_ms
+    )
+    deeper = None if max_depth is None else max_depth - 1
 
     # Reduced labeling: μ(m) and γ(g) for this view's lattice.
     mu = _mu_local(view.lattice)
@@ -534,7 +500,7 @@ def exploration_view_to_nested_data(
     # Subdirect decomposition: shared inner template from the ⊤ outer concept.
     top_concept = view.lattice.top()
     top_id = top_concept.stable_id()
-    template_view = view.children.get(top_id)
+    template_view = view.children.get(top_id) if max_depth != 0 else None
 
     inner_template = None
     gamma_by_name: dict[str, str] = {}
@@ -542,7 +508,7 @@ def exploration_view_to_nested_data(
     filled_by_outer: dict[str, set[str]] = {}
 
     if template_view is not None:
-        tdata = _inner_template_data(template_view)
+        tdata = _inner_template_data(template_view, timeout_ms=timeout_ms)
         gamma_by_name = tdata.pop("gamma_by_name")
         inner_template = tdata
         inner_scale_names = list(template_view.scale_names)
@@ -568,8 +534,7 @@ def exploration_view_to_nested_data(
                 f"but the following attributes appear in both: {sorted(overlap)}"
             )
 
-        gamma_inner = _gamma_local(template_view.lattice)
-        filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice, gamma, gamma_inner)
+        filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice)
 
     _fmt_obj: Callable[[str], str] = object_label if object_label is not None else (lambda x: x)
 
@@ -599,9 +564,9 @@ def exploration_view_to_nested_data(
             # Recursively build the per-concept data to get N-layer children
             # and the next-layer inner_template.
             per_concept_data: dict[str, Any] | None = None
-            if per_concept_view is not None:
+            if per_concept_view is not None and (deeper is None or deeper >= 1):
                 per_concept_data = exploration_view_to_nested_data(
-                    per_concept_view, object_label
+                    per_concept_view, object_label, timeout_ms, deeper
                 )
 
             # Intent-based lookup: attribute indices are invariant across views
@@ -673,10 +638,12 @@ def exploration_view_to_nested_data(
 
         # Fallback for partial expansions: no template, but this specific
         # concept has a child view attached directly.
-        if child_data is None and inner_template is None:
+        if child_data is None and inner_template is None and max_depth != 0:
             child_view = view.children.get(node.node_id)
             if child_view is not None:
-                child_data = exploration_view_to_nested_data(child_view, object_label)
+                child_data = exploration_view_to_nested_data(
+                    child_view, object_label, timeout_ms, deeper
+                )
 
         nodes.append(
             {
@@ -1519,7 +1486,10 @@ def plot_nested(
     height: int = 700,
     title: str | None = None,
     object_label: Callable[[str], str] | None = None,
-) -> HTMLFigure:
+    backend: str = "d3",
+    timeout_ms: int | None = 1000,
+    **kwargs,
+):
     """
     Plot a nested exploration view with subdirect decomposition.
 
@@ -1528,21 +1498,51 @@ def plot_nested(
     view:
         Root ExplorationView to render.
     width, height:
-        Figure size in pixels.
+        Figure size in pixels (d3 backend).
     show_child_previews:
         Whether to draw the inner template preview inside outer nodes.
+    backend:
+        - "d3": interactive, navigable HTMLFigure (all nesting levels).
+        - "matplotlib": static matplotlib Figure of the first nesting level;
+          write it with ``fig.savefig("nested.pdf")``. Only the levels it
+          draws are laid out, so it is faster than "d3" on deep trees.
+    timeout_ms:
+        DimFlux time limit per layout; see ``lattice_to_graph_data_dimflux``.
+    **kwargs:
+        Passed to ``render_nested_matplotlib`` (e.g. ``ax``, ``figsize``,
+        ``show_object_labels``).
 
     Returns
     -------
-    HTMLFigure
-        Notebook-displayable and exportable HTML figure.
+    HTMLFigure or matplotlib Figure
     """
     if mode != "navigator":
         raise ValueError(
             f'Unknown nested visualization mode "{mode}". '
             'Currently only "navigator" is supported.'
         )
-    data = exploration_view_to_nested_data(view, object_label=object_label)
+    if backend not in {"d3", "matplotlib"}:
+        raise ValueError(
+            f'Unknown nested visualization backend "{backend}". '
+            'Use "d3" or "matplotlib".'
+        )
+    if backend == "matplotlib":
+        data = exploration_view_to_nested_data(
+            view, object_label=object_label, timeout_ms=timeout_ms, max_depth=1
+        )
+        from conceptflow.visualization.static import render_nested_matplotlib
+
+        return render_nested_matplotlib(data, title=title, **kwargs)
+
+    data = exploration_view_to_nested_data(
+        view, object_label=object_label, timeout_ms=timeout_ms
+    )
+
+    if kwargs:
+        raise TypeError(
+            f"Unexpected arguments for the d3 backend: {sorted(kwargs)}"
+        )
+
     html = render_nested_html(
         data,
         width=width,

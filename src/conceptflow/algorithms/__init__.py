@@ -16,7 +16,13 @@ from conceptflow.algorithms._registry import (
 )
 
 from conceptflow.algorithms.hasse import compute_hasse_edges, is_cover
-from conceptflow.algorithms.implications import Implication, compute_canonical_basis
+from conceptflow.algorithms.implications import (
+    AssociationRule,
+    Implication,
+    compute_canonical_basis,
+    compute_canonical_basis_bruteforce,
+    compute_luxenburger_basis,
+)
 from conceptflow.algorithms.order import strict_subconcept_of, subconcept_of
 
 from conceptflow.algorithms.reduction import (
@@ -39,6 +45,9 @@ __all__ = [
     "compute_hasse_edges",
     "Implication",
     "compute_canonical_basis",
+    "compute_canonical_basis_bruteforce",
+    "AssociationRule",
+    "compute_luxenburger_basis",
     "SUPPORTED_ENUMERATION_ALGORITHMS",
     "normalize_enumeration_algorithm",
     "ClarificationResult",

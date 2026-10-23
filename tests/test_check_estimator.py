@@ -1,90 +1,94 @@
 """
 Formal sklearn check_estimator / parametrize_with_checks tests.
 
-ConceptMembershipEncoder, ConceptLatticeEstimator, and ImplicationBasisEstimator
-pass all checks except check_transformer_preserve_dtypes — all three always
-output bool by design.
+All transformers declare ``tags.transformer_tags.preserves_dtype = []``: they
+output boolean membership indicators (or 0/1/NaN floats for
+``ConceptualScaler(missing="unknown")``) whatever the input dtype, so sklearn
+does not expect dtype preservation.
 
-ConceptualScaler uses NominalScale(0), which resolves to source_attribute="x0".
-Generic numpy arrays are converted to ManyValuedContexts with synthesised column
-names x0, x1, ... so NominalScale(0) works with any 2D array.  The xfails are:
-  - check_transformer_preserve_dtypes: always outputs bool (same as above)
-  - check_fit_idempotent: transforms a second, independently-generated random
-    dataset through the same fitted estimator. NominalScale has a fixed,
-    fit-time-derived vocabulary by FCA design (unlike a numeric scaler), so it
-    correctly raises ValueError when the check's second dataset contains
-    values outside that vocabulary -- this is not a bug, see
-    NominalScale.encode_value.
+ConceptualScaler is checked with ``ThresholdScale(0, ...)``, which resolves to
+source_attribute="x0" (generic numpy arrays get synthesised column names x0,
+x1, ...). A threshold scale accepts any number, which is what sklearn's checks
+feed in. Nominal-type scales instead keep the vocabulary seen at fit time and
+reject unseen values; sklearn's ``check_fit_idempotent`` transforms freshly
+generated random floats, so it cannot pass for them. That design boundary is
+tested directly below (``test_nominal_vocabulary_is_fixed_at_fit_time``).
 
-NaN is treated as a valid category value by design (not an error condition),
-so ConceptualScaler declares tags.input_tags.allow_nan = True; this makes
-check_estimators_nan_inf pass rather than xfail.
+The one remaining expected failure:
+  - check_estimators_nan_inf (missing="error" only): NaN is a missing value
+    and is rejected exactly as sklearn expects, but inf is a legitimate
+    many-valued value (e.g. for ThresholdScale), so it is scaled, not rejected.
 """
 
+import numpy as np
+import pandas as pd
 import pytest
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from conceptflow.cluster import ConceptLatticeEstimator
 from conceptflow.feature_extraction import ConceptMembershipEncoder
-from conceptflow.preprocessing import ConceptualScaler, NominalScale
+from conceptflow.preprocessing import ConceptualScaler, NominalScale, ThresholdScale
 from conceptflow.rules import ImplicationBasisEstimator
 
-
-_BOOL_OUTPUT_XFAIL = (
-    "Always outputs bool dtype regardless of input dtype — concept membership "
-    "indicators are inherently boolean."
+_INF_IS_A_VALUE = (
+    'NaN is rejected under the default missing="error", but inf is a valid '
+    "many-valued value and is scaled like any other value."
 )
 
-_CME_EXPECTED_FAILURES = {
-    "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
-}
 
-_CLE_EXPECTED_FAILURES = {
-    "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
-}
-
-_IBE_EXPECTED_FAILURES = {
-    "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
-}
-
-_SCALER_EXPECTED_FAILURES = {
-    "check_transformer_preserve_dtypes": _BOOL_OUTPUT_XFAIL,
-    "check_fit_idempotent": (
-        "NominalScale has a fixed, fit-time vocabulary by design; transforming "
-        "a second, independently-generated dataset containing out-of-vocabulary "
-        "values correctly raises ValueError instead of silently producing "
-        "wrong output."
-    ),
-}
+def _scaler_expected_failures(est):
+    if est.missing == "error":
+        return {"check_estimators_nan_inf": _INF_IS_A_VALUE}
+    return {}
 
 
-@parametrize_with_checks(
-    [ConceptMembershipEncoder()],
-    expected_failed_checks=lambda est: _CME_EXPECTED_FAILURES,
-)
+def _scaler(**kwargs):
+    return ConceptualScaler(scales=[ThresholdScale(0, [0.0, 0.5])], **kwargs)
+
+
+@parametrize_with_checks([ConceptMembershipEncoder()])
 def test_concept_membership_encoder_sklearn_checks(estimator, check):
     check(estimator)
 
 
-@parametrize_with_checks(
-    [ConceptLatticeEstimator()],
-    expected_failed_checks=lambda est: _CLE_EXPECTED_FAILURES,
-)
+@parametrize_with_checks([ConceptLatticeEstimator()])
 def test_concept_lattice_estimator_sklearn_checks(estimator, check):
     check(estimator)
 
 
 @parametrize_with_checks(
-    [ConceptualScaler(scales=[NominalScale(0)])],
-    expected_failed_checks=lambda est: _SCALER_EXPECTED_FAILURES,
+    [
+        _scaler(),
+        _scaler(missing="false"),
+        _scaler(missing="unknown"),
+        _scaler(missing="unknown", output="dataframe"),
+        _scaler(output="dataframe"),
+        _scaler(output="sparse"),
+    ],
+    expected_failed_checks=_scaler_expected_failures,
 )
 def test_conceptual_scaler_sklearn_checks(estimator, check):
     check(estimator)
 
 
-@parametrize_with_checks(
-    [ImplicationBasisEstimator()],
-    expected_failed_checks=lambda est: _IBE_EXPECTED_FAILURES,
-)
+@parametrize_with_checks([ImplicationBasisEstimator()])
 def test_implication_basis_estimator_sklearn_checks(estimator, check):
     check(estimator)
+
+
+def test_nominal_vocabulary_is_fixed_at_fit_time():
+    # The design boundary that keeps NominalScale out of the generic checks:
+    # feature names never drift with transform-time data, and unseen values
+    # raise instead of being silently dropped.
+    train = pd.DataFrame({"color": ["red", "blue"]})
+    scaler = ConceptualScaler(scales=[NominalScale("color")]).fit(train)
+
+    assert list(scaler.get_feature_names_out()) == ["color=blue", "color=red"]
+    assert scaler.transform(pd.DataFrame({"color": ["red"]})).tolist() == [[False, True]]
+
+    with pytest.raises(ValueError, match="vocabulary"):
+        scaler.transform(pd.DataFrame({"color": ["green"]}))
+
+    # Refitting on the same data is idempotent.
+    refit = ConceptualScaler(scales=[NominalScale("color")]).fit(train)
+    assert np.array_equal(refit.transform(train), scaler.transform(train))

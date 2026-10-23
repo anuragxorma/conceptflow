@@ -1,6 +1,6 @@
 # ConceptFlow
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
@@ -22,40 +22,22 @@ cd conceptflow
 pip install -e ".[dev]"
 ```
 
-### Java requirement for nested diagrams
+ConceptFlow requires Python 3.12 or newer. Lattice and nested-diagram layouts
+use [DimFlux](https://arxiv.org/abs/2603.16366) (the `dim-flux` package, installed
+automatically; licensed CC BY 4.0). matplotlib, used for static figures, is
+installed with it.
 
-Nested-diagram layout (`plot_nested`, and anything using the DimFlux/DimDraw
-layout engine) shells out to a bundled Java tool, so a JRE (Java 11+) must be
-installed and available as `java` on `PATH`. Core FCA computation (contexts,
-lattices, scaling, enumeration) does not need Java — only nested-diagram
-rendering does.
+See [CHANGELOG.md](https://github.com/anuragxorma/conceptflow/blob/main/CHANGELOG.md) for what changed between releases.
 
-```bash
-# Debian/Ubuntu
-sudo apt install default-jre
-
-# macOS (Homebrew)
-brew install openjdk
-
-# Verify it's on PATH
-java -version
-```
-
-If you'd rather not put a JRE on `PATH`, point ConceptFlow at a specific
-binary instead:
-
-```bash
-export CONCEPTFLOW_JAVA_BIN=/path/to/java
-```
-
-Runnable versions of every code snippet below live in [`examples/`](examples/),
-including a full case study in [`examples/eurovision_nested_diagram.py`](examples/eurovision_nested_diagram.py).
+Runnable versions of every code snippet below live in [`examples/`](https://github.com/anuragxorma/conceptflow/tree/main/examples/),
+including a full case study in [`examples/eurovision_nested_diagram.py`](https://github.com/anuragxorma/conceptflow/blob/main/examples/eurovision_nested_diagram.py).
 
 ## Current features
 
 **Core FCA structures**
 - Binary formal contexts
 - Many-valued contexts
+- Incomplete (three-valued: yes / no / unknown) contexts
 - Formal concepts
 - Concept lattice construction
 
@@ -64,6 +46,7 @@ including a full case study in [`examples/eurovision_nested_diagram.py`](example
 
 **Preprocessing**
 - Conceptual scaling with seven scale types
+- Explicit missing-value handling (error / closed world / unknown)
 - scikit-learn compatible preprocessing
 
 **scikit-learn estimators**
@@ -73,15 +56,18 @@ including a full case study in [`examples/eurovision_nested_diagram.py`](example
 **Visualization**
 - Nested line diagrams (subdirect decomposition)
 - Interactive nested diagram visualization
+- Static SVG/PDF/PNG export of lattices and nested diagrams (matplotlib)
+- Realized / unrealized nested-diagram combinations as a DataFrame
 
 **I/O**
 - Burmeister `.cxt` read/write support
 
 **Metrics**
-- Basic support and confidence metrics
+- Basic support and confidence metrics, exception objects of a rule
 
 **Rules**
-- Duquenne-Guigues (stem) basis / implication computation
+- Duquenne-Guigues (stem) basis / implication computation (NextClosure)
+- Luxenburger basis of near-implications, with exception objects
 
 **Decomposition**
 - Ordinal two-factorization
@@ -201,6 +187,48 @@ Supported outputs:
 "array"      -> NumPy ndarray
 "sparse"     -> scipy.sparse CSR matrix
 ```
+
+### Missing values
+
+In a binary `FormalContext`, empty cells (None, NaN, `pd.NA`) mean "no
+cross", as in a printed cross table. In many-valued data a missing value
+(None, NaN, NaT, `pd.NA`, or the string `"?"`) is ambiguous: the attribute may
+not apply to the object, or its value may be unknown. It is never silently
+turned into crosses or non-crosses; `ConceptualScaler(missing=...)` makes the
+choice explicit:
+
+```text
+"error"    -> raise ValueError naming the attribute and objects (default)
+"false"    -> the object gets none of that scale's attributes (closed world)
+"unknown"  -> attributes true for every value of the scale stay known-yes,
+              those true for none stay known-no, the rest become unknown
+```
+
+With `missing="unknown"`, `output="context"` returns an `IncompleteContext`,
+`"array"` and `"dataframe"` return floats (1.0 / 0.0, NaN for unknown), the
+scikit-learn convention for missing values.
+Unknown entries are independent of each other, so an implication that follows
+from a scale itself (such as `size>=L -> size>=M`) may be reported as
+"possible" rather than "valid".
+
+### Incomplete contexts
+
+`IncompleteContext` stores yes / no / unknown entries. Questions are answered
+over all *completions* (ways to fill in the unknowns):
+
+```python
+from conceptflow import IncompleteContext
+
+ctx = IncompleteContext.from_dataframe(df)   # True/False/1/0; None, NaN or "?" = unknown
+
+ctx.certain_context()     # FormalContext with unknown -> no
+ctx.possible_context()    # FormalContext with unknown -> yes
+ctx.implication_status(["linear"], ["polar"])          # "valid" | "possible" | "refuted"
+ctx.implication_counterexamples(["linear"], ["polar"])  # (certain, possible) object indices
+```
+
+Only booleans and 0/1 are accepted as known values; strings such as `"no"`
+raise instead of being coerced to True.
 
 ### Scale types
 
@@ -404,10 +432,40 @@ fig.show()               # display in Jupyter
 fig.write_html("out.html")  # export to HTML
 ```
 
-`plot_nested` computes the subdirect product of the two factor lattices using the
-join-closure algorithm (no explicit combined context is built), then renders an
-interactive navigator with the D3.js force-directed layout. See
-[docs/nested_diagram_tutorial.md](docs/nested_diagram_tutorial.md) for the full
+`plot_nested` determines which (outer, inner) concept pairs of the two factor
+lattices are realized by the combined context, then renders an interactive
+navigator with the D3.js force-directed layout.
+
+For publication figures, use the matplotlib backend and save to any format
+matplotlib supports:
+
+```python
+from conceptflow.visualization import plot_lattice, plot_nested
+
+fig = plot_nested(outer_view, backend="matplotlib", show_object_labels=True)
+fig.savefig("nested.pdf")
+
+fig = plot_lattice(lattice, backend="matplotlib")
+fig.savefig("lattice.svg")
+
+# Lattices too large for DimFlux: use a quick layered layout instead.
+fig = plot_lattice(lattice, backend="matplotlib", layout="none", show_object_labels=False)
+```
+
+DimFlux layouts take seconds for small lattices but can take minutes once a
+lattice has a few hundred concepts (ConceptFlow warns above 150). `timeout_ms`
+(default 1000) limits each optimization phase loosely, not the total run time.
+
+The realized and unrealized combinations (filled and hollow inner nodes) are
+also available as data:
+
+```python
+from conceptflow.exploration import nested_combinations
+
+table = nested_combinations(outer_view)   # one row per (outer, inner) pair
+table[~table.realized]                    # attribute combinations that never occur
+``` See
+[docs/nested_diagram_tutorial.md](https://github.com/anuragxorma/conceptflow/blob/main/docs/nested_diagram_tutorial.md) for the full
 mathematical derivation.
 
 ## `.cxt` input/output
@@ -425,6 +483,7 @@ write_cxt(ctx, "output.cxt")
 from conceptflow.metrics import (
     attribute_set_support,
     implication_confidence,
+    implication_exceptions,
 )
 
 support = attribute_set_support(ctx, attributes=[0, 1])
@@ -434,6 +493,9 @@ confidence = implication_confidence(
     premise=[0],
     conclusion=[1],
 )
+
+# Objects with the premise but not the conclusion (empty iff the rule holds).
+exceptions = implication_exceptions(ctx, premise=["a"], conclusion=["b"])
 ```
 
 ## Feature extraction
@@ -546,13 +608,38 @@ for implication in estimator.get_implications():
 objects); `transform` re-derives, for any object (not just the ones it was
 fit on), which implications' premises that object's own attributes satisfy —
 one boolean feature per implication. The underlying algorithm
-(`conceptflow.algorithms.compute_canonical_basis`) enumerates candidate
-attribute sets smallest-first and checks each against the standard
-pseudo-intent definition; see
-[docs/nested_diagram_tutorial.md](docs/nested_diagram_tutorial.md) for how
+(`conceptflow.algorithms.compute_canonical_basis`) is Ganter's NextClosure on
+integer bitsets, which visits only intents and pseudo-intents; closures under
+the implications found so far are vectorised with NumPy and abandoned as soon
+as they fail the canonicity test. A 357 x 42 context with 1,376 implications
+takes about 0.2 s. `compute_canonical_basis_bruteforce` checks every attribute
+subset against the pseudo-intent definition and is
+kept as a reference implementation. See
+[docs/nested_diagram_tutorial.md](https://github.com/anuragxorma/conceptflow/blob/main/docs/nested_diagram_tutorial.md) for how
 implications relate to hollow nodes in a nested diagram, and
-[examples/eurovision_nested_diagram.py](examples/eurovision_nested_diagram.py)
+[examples/eurovision_nested_diagram.py](https://github.com/anuragxorma/conceptflow/blob/main/examples/eurovision_nested_diagram.py)
 for a full worked example.
+
+### Near-implications (Luxenburger basis)
+
+Rules that hold for most but not all objects come from neighbouring concepts:
+for an upper neighbour `(A1, B1)` of `(A2, B2)`, the rule `B1 -> B2 \ B1` has
+confidence `|A2| / |A1|`. Each rule lists its exception objects.
+
+```python
+from conceptflow.algorithms import compute_luxenburger_basis
+
+rules = compute_luxenburger_basis(ctx, min_confidence=0.8, min_support=3)
+
+for rule in rules:
+    print(
+        rule.premise_names(ctx), "->", rule.conclusion_names(ctx),
+        f"conf={rule.confidence:.2f}", f"support={rule.support}/{rule.premise_support}",
+        "exceptions:", rule.exception_names(ctx),
+    )
+```
+
+`min_support` is an object count (int) or a fraction of all objects (float).
 
 ## Design philosophy
 
@@ -669,9 +756,9 @@ This separation allows the same FCA structures to be reused across:
 
 ## Further reading
 
-- [docs/architecture.md](docs/architecture.md) — the full layered-architecture design.
-- [docs/nested_diagram_tutorial.md](docs/nested_diagram_tutorial.md) — tutorial on nested line diagrams.
-- [docs/nested_diagram_construction.md](docs/nested_diagram_construction.md) — mathematical construction of the join-closure algorithm.
+- [docs/architecture.md](https://github.com/anuragxorma/conceptflow/blob/main/docs/architecture.md) — the full layered-architecture design.
+- [docs/nested_diagram_tutorial.md](https://github.com/anuragxorma/conceptflow/blob/main/docs/nested_diagram_tutorial.md) — tutorial on nested line diagrams.
+- [docs/nested_diagram_construction.md](https://github.com/anuragxorma/conceptflow/blob/main/docs/nested_diagram_construction.md) — mathematical construction of the join-closure algorithm.
 - [Eurovision case study](https://kde.cs.uni-kassel.de/blogs/esc) — worked example and interactive diagram.
 
 ## License

@@ -4,12 +4,12 @@ Sklearn-compatible concept lattice estimator.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted
 
+from conceptflow.algorithms._membership import contains_sets
 from conceptflow.core import ConceptLattice as CoreConceptLattice
 from conceptflow.validation import check_binary_context_input
 
@@ -92,14 +92,9 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
         # contains that concept's intent -- the standard FCA notion of
         # concept membership, which generalizes correctly to objects the
         # lattice was never fit on.
-        data = [
-            [
-                concept.intent
-                <= frozenset(np.flatnonzero(context.incidence[object_index]).tolist())
-                for concept in self.concepts_
-            ]
-            for object_index in range(context.n_objects)
-        ]
+        data = contains_sets(
+            context.incidence, [concept.intent for concept in self.concepts_]
+        )
 
         output_df = pd.DataFrame(
             data,
@@ -133,4 +128,7 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.input_tags.sparse = True
+        # Outputs are boolean membership indicators (or 0/1/NaN floats),
+        # whatever the input dtype; tell sklearn not to expect preservation.
+        tags.transformer_tags.preserves_dtype = []
         return tags

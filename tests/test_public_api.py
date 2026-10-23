@@ -173,3 +173,27 @@ def test_exploration_public_api_imports():
 
     assert ExplorationBuilder is not None
     assert ExplorationView is not None
+
+def test_rule_mining_and_incomplete_context_public_api_imports():
+    from conceptflow import IncompleteContext
+    from conceptflow.algorithms import (
+        AssociationRule,
+        compute_canonical_basis_bruteforce,
+        compute_luxenburger_basis,
+    )
+    from conceptflow.exploration import nested_combinations, realized_pairs
+    from conceptflow.metrics import implication_exceptions
+    from conceptflow.visualization import (
+        render_lattice_matplotlib,
+        render_nested_matplotlib,
+    )
+
+    assert IncompleteContext is not None
+    assert AssociationRule is not None
+    assert compute_canonical_basis_bruteforce is not None
+    assert compute_luxenburger_basis is not None
+    assert nested_combinations is not None
+    assert realized_pairs is not None
+    assert implication_exceptions is not None
+    assert render_lattice_matplotlib is not None
+    assert render_nested_matplotlib is not None

@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from itertools import chain, combinations
 
+from conceptflow.algorithms._bitset import BitsetContext, to_indices
 from conceptflow.algorithms._registry import normalize_enumeration_algorithm
 from conceptflow.algorithms.derivation import (
     attribute_closure,
@@ -64,117 +65,126 @@ def enumerate_concepts_bruteforce(context: FormalContext) -> list[Concept]:
     )
 
 
-def _next_closure_candidate(
-    context: FormalContext,
-    current_intent: frozenset[int],
-    attribute_order: list[int],
-) -> frozenset[int] | None:
-    """
-    Compute the next closed intent after current_intent in lectic order.
-    """
-    index_of = {attribute: i for i, attribute in enumerate(attribute_order)}
+def _intent_of(extent: int, columns: list[int]) -> int:
+    """A' for an object bitset A: attributes whose column contains A."""
+    intent = 0
+    for m, column in enumerate(columns):
+        if extent & column == extent:
+            intent |= 1 << m
+    return intent
 
-    for i in range(len(attribute_order) - 1, -1, -1):
-        attribute = attribute_order[i]
 
-        if attribute in current_intent:
-            continue
-
-        prefix = {a for a in current_intent if index_of[a] < i}
-        candidate_seed = prefix | {attribute}
-        candidate_closure = attribute_closure(context, candidate_seed)
-
-        is_valid = True
-
-        for j in range(i):
-            earlier_attribute = attribute_order[j]
-
-            if (
-                earlier_attribute in candidate_closure
-            ) != (
-                earlier_attribute in current_intent
-            ):
-                is_valid = False
-                break
-
-        if is_valid:
-            return candidate_closure
-
-    return None
+def _to_concept(extent: int, intent: int) -> Concept:
+    return Concept(extent=to_indices(extent), intent=to_indices(intent))
 
 
 def enumerate_concepts_nextclosure(context: FormalContext) -> list[Concept]:
     """
     Enumerate all formal concepts using the NextClosure algorithm.
+
+    Concepts are returned in lectic order of their intents (attribute 0 is
+    the most significant). Sets are integer bitsets internally, so a closure
+    costs one AND per attribute instead of NumPy calls.
     """
+    bits = BitsetContext(context)
+    columns = bits.columns
+    n_attributes = bits.n_attributes
+
+    def close(attributes: int) -> tuple[int, int]:
+        extent = bits.extent(attributes)
+        return extent, _intent_of(extent, columns)
+
     concepts: list[Concept] = []
+    current: tuple[int, int] | None = close(0)
 
-    attribute_order = list(range(context.n_attributes))
-    current_intent: frozenset[int] | None = attribute_closure(context, [])
+    while current is not None:
+        extent, intent = current
+        concepts.append(_to_concept(extent, intent))
 
-    while current_intent is not None:
-        extent = attribute_derivation(context, current_intent)
-        concepts.append(Concept(extent=extent, intent=current_intent))
+        current = None
+        prefix = intent
 
-        current_intent = _next_closure_candidate(
-            context=context,
-            current_intent=current_intent,
-            attribute_order=attribute_order,
-        )
+        for i in range(n_attributes - 1, -1, -1):
+            bit = 1 << i
+
+            if prefix & bit:
+                prefix &= ~bit
+                continue
+
+            candidate_extent, candidate_intent = close(prefix | bit)
+
+            # Canonical iff the closure adds no attribute below i.
+            if (candidate_intent & ~prefix) & (bit - 1) == 0:
+                current = (candidate_extent, candidate_intent)
+                break
 
     return concepts
 
-def enumerate_concepts_closebyone(context: FormalContext) -> list[Concept]:
+
+def _closebyone_bitsets(
+    bits: BitsetContext,
+    min_extent_size: int = 0,
+) -> list[tuple[int, int]]:
     """
-    Enumerate formal concepts using a simple CloseByOne-style recursion.
+    Close-by-One on integer bitsets; returns ``(extent, intent)`` pairs.
 
-    This implementation is intended as a clear baseline implementation of
-    the CloseByOne idea: recursively generate closures and use a canonicity
-    condition to avoid duplicates.
+    Concepts with fewer than ``min_extent_size`` objects are pruned with
+    their whole subtree: extending a concept only shrinks its extent, and a
+    concept's canonical generation path runs through larger extents only,
+    so no concept above the threshold is lost.
     """
-    concepts: set[Concept] = set()
-    n_attributes = context.n_attributes
+    columns = bits.columns
+    n_attributes = bits.n_attributes
 
-    def is_canonical(
-        current_intent: frozenset[int],
-        candidate_intent: frozenset[int],
-        attribute_index: int,
-    ) -> bool:
-        """
-        Check the CloseByOne canonicity condition.
+    if bits.n_objects < min_extent_size:
+        return []
 
-        A candidate is canonical if no earlier attribute was introduced by
-        the closure unless it was already present in the current intent.
-        """
-        for earlier in range(attribute_index):
-            if earlier in candidate_intent and earlier not in current_intent:
-                return False
+    found: list[tuple[int, int]] = []
+    stack = [(bits.all_objects, _intent_of(bits.all_objects, columns), 0)]
 
-        return True
+    while stack:
+        extent, intent, start = stack.pop()
+        found.append((extent, intent))
 
-    def recurse(intent: frozenset[int], start_attribute: int) -> None:
-        extent = attribute_derivation(context, intent)
-        concepts.add(Concept(extent=extent, intent=intent))
-
-        for attribute_index in range(start_attribute, n_attributes):
-            if attribute_index in intent:
+        for j in range(start, n_attributes):
+            if intent >> j & 1:
                 continue
 
-            candidate_seed = intent | {attribute_index}
-            candidate_intent = attribute_closure(context, candidate_seed)
+            new_extent = extent & columns[j]
 
-            if is_canonical(
-                current_intent=intent,
-                candidate_intent=candidate_intent,
-                attribute_index=attribute_index,
+            if new_extent.bit_count() < min_extent_size:
+                continue
+
+            if any(
+                not intent >> m & 1 and new_extent & columns[m] == new_extent
+                for m in range(j)
             ):
-                recurse(
-                    intent=candidate_intent,
-                    start_attribute=attribute_index + 1,
-                )
+                continue
 
-    initial_intent = attribute_closure(context, [])
-    recurse(initial_intent, 0)
+            new_intent = intent | (1 << j)
+            for m in range(j + 1, n_attributes):
+                if not new_intent >> m & 1 and new_extent & columns[m] == new_extent:
+                    new_intent |= 1 << m
+
+            stack.append((new_extent, new_intent, j + 1))
+
+    return found
+
+
+def enumerate_concepts_closebyone(context: FormalContext) -> list[Concept]:
+    """
+    Enumerate formal concepts using Close-by-One.
+
+    Starting from the top concept, each concept (A, B) is extended by every
+    attribute j > (the attribute that generated it) not in B: the new extent
+    is A ∩ j'. The extension is canonical, and therefore new, iff no
+    attribute below j that is missing from B holds for the whole new extent;
+    that test runs before the rest of the new intent is computed, so most
+    duplicates are rejected early. Sets are integer bitsets throughout.
+    """
+    found = _closebyone_bitsets(BitsetContext(context))
+
+    concepts = [_to_concept(extent, intent) for extent, intent in found]
 
     return sorted(
         concepts,

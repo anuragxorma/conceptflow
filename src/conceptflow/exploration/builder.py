@@ -14,15 +14,35 @@ from conceptflow.preprocessing import ConceptualScaler, Scale
 class ExplorationBuilder:
     """
     Build root and child ExplorationView objects from many-valued data.
+
+    Parameters
+    ----------
+    mvc:
+        Many-valued data to explore.
+
+    algorithm:
+        Concept enumeration algorithm.
+
+    missing:
+        Missing-value policy passed to ``ConceptualScaler``: "error"
+        (default) or "false". Nested diagrams need complete contexts, so
+        "unknown" is not available here.
     """
 
     def __init__(
         self,
         mvc: ManyValuedContext,
         algorithm: str = "nextclosure",
+        missing: str = "error",
     ) -> None:
+        if missing not in {"error", "false"}:
+            raise ValueError(
+                'ExplorationBuilder supports missing="error" or missing="false".'
+            )
+
         self.mvc = mvc
         self.algorithm = algorithm
+        self.missing = missing
 
     def root(
         self,
@@ -32,12 +52,7 @@ class ExplorationBuilder:
         """
         Build the root exploration view.
         """
-        scaler = ConceptualScaler(
-            scales=scales,
-            output="context",
-        )
-
-        ctx = scaler.fit_transform(self.mvc)
+        ctx = self._scale(self.mvc, scales)
 
         lattice = ConceptLattice.from_context(
             ctx,
@@ -51,6 +66,27 @@ class ExplorationBuilder:
             depth=0,
             scale_names=tuple(scale.source_attribute for scale in scales),
         )
+
+    def _scale(self, mvc: ManyValuedContext, scales: list[Scale]):
+        """Scale ``mvc`` into a formal context with this builder's policy."""
+        scaler = ConceptualScaler(
+            scales=scales,
+            output="context",
+            missing=self.missing,
+        )
+
+        try:
+            return scaler.fit_transform(mvc)
+        except ValueError as exc:
+            if "Input contains NaN" not in str(exc):
+                raise
+            # The scaler's own hint mentions missing="unknown", which nested
+            # diagrams cannot use.
+            raise ValueError(
+                f"{str(exc).split('. Pass ')[0]}. Create the builder with "
+                'ExplorationBuilder(..., missing="false") to treat missing values '
+                "as having none of the scale's attributes."
+            ) from exc
 
     def _is_expandable(self, concept: Concept) -> bool:
         """
@@ -96,12 +132,7 @@ class ExplorationBuilder:
 
         sub_mvc = self.mvc.restrict_objects(object_names)
 
-        scaler = ConceptualScaler(
-            scales=scales,
-            output="context",
-        )
-
-        child_ctx = scaler.fit_transform(sub_mvc)
+        child_ctx = self._scale(sub_mvc, scales)
 
         child_lattice = ConceptLattice.from_context(
             child_ctx,

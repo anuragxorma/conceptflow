@@ -37,7 +37,7 @@ from conceptflow.preprocessing import DichotomicScale, GeneralScale, ThresholdSc
 from conceptflow.rules import ImplicationBasisEstimator
 from conceptflow.visualization import debug_bottom_outer, plot_nested
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
-from conceptflow.visualization.nested import _compute_filled_pairs, _gamma_local
+from conceptflow.exploration import realized_pairs
 
 
 DATASET_ROOT = Path("examples/eurovision-dataset/data/senior")
@@ -422,9 +422,9 @@ def compute_implication_basis(root) -> list[dict]:
     basis = ImplicationBasisEstimator().fit(combined_ctx).get_implications()
 
     # Pre-compute filled pairs for the diagram-impact count.
-    gamma_o = _gamma_local(root.lattice)
-    gamma_i = _gamma_local(root.children[top_id].lattice)
-    filled_by_outer = _compute_filled_pairs(root.lattice, root.children[top_id].lattice, gamma_o, gamma_i)
+    filled_by_outer: dict[str, set[str]] = {}
+    for outer_c, inner_c in realized_pairs(root.lattice, root.children[top_id].lattice):
+        filled_by_outer.setdefault(outer_c.stable_id(), set()).add(inner_c.stable_id())
 
     oc_list = list(root.lattice.concepts)
     ic_list = list(root.children[top_id].lattice.concepts)

@@ -13,7 +13,7 @@ Run from the project root:
 
 Output:
 
-    nested_diagram_diabetes.html
+    nested_diagram_diabetes_previews.html
 """
 
 import pandas as pd

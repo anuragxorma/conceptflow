@@ -14,6 +14,7 @@ and will use this class internally.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 
 from conceptflow.algorithms.hasse import compute_hasse_edges
 from conceptflow.core.concept import Concept
@@ -59,13 +60,31 @@ class ConceptLattice:
         """Number of concepts in the lattice."""
         return len(self.concepts)
 
-    @property
+    # Derived structure is computed once and cached on the instance.
+    # cached_property writes to the instance __dict__ directly, so it works on
+    # a frozen dataclass.
+
+    @cached_property
     def edges(self) -> tuple[tuple[Concept, Concept], ...]:
         """
         Hasse diagram edges as ``(lower, upper)`` pairs.
         """
-        return compute_hasse_edges(self.concepts)
-    
+        return compute_hasse_edges(self.concepts, context=self.context)
+
+    @cached_property
+    def _upper_neighbours(self) -> dict[Concept, frozenset[Concept]]:
+        neighbours: dict[Concept, set[Concept]] = {c: set() for c in self.concepts}
+        for lower, upper in self.edges:
+            neighbours[lower].add(upper)
+        return {c: frozenset(ups) for c, ups in neighbours.items()}
+
+    @cached_property
+    def _lower_neighbours(self) -> dict[Concept, frozenset[Concept]]:
+        neighbours: dict[Concept, set[Concept]] = {c: set() for c in self.concepts}
+        for lower, upper in self.edges:
+            neighbours[upper].add(lower)
+        return {c: frozenset(lows) for c, lows in neighbours.items()}
+
     def to_networkx(self):
         """
         Convert the concept lattice to a NetworkX directed graph.
@@ -91,17 +110,13 @@ class ConceptLattice:
         """
         Immediate upper neighbours of a concept.
         """
-        return frozenset(
-            upper for lower, upper in self.edges if lower == concept
-        )
+        return self._upper_neighbours.get(concept, frozenset())
 
     def children(self, concept: Concept) -> frozenset[Concept]:
         """
         Immediate lower neighbours of a concept.
         """
-        return frozenset(
-            lower for lower, upper in self.edges if upper == concept
-        )
+        return self._lower_neighbours.get(concept, frozenset())
 
     def top(self) -> Concept:
         """

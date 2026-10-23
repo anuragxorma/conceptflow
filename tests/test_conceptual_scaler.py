@@ -314,3 +314,98 @@ def test_conceptual_scaler_output_sparse():
     assert sparse.issparse(out)
     assert out.shape == (2, 2)
     assert out.dtype == bool
+
+# ---------------------------------------------------------------------------
+# Missing values
+# ---------------------------------------------------------------------------
+
+
+def make_missing_df():
+    return pd.DataFrame(
+        {
+            "color": ["red", "blue", None],
+            "score": [10.0, np.nan, 60.0],
+        },
+        index=["g1", "g2", "g3"],
+    )
+
+
+MISSING_SCALES = [NominalScale("color"), ThresholdScale("score", [20, 50])]
+
+
+def test_missing_values_raise_by_default():
+    with pytest.raises(ValueError, match="NaN.*color.*'g3'"):
+        ConceptualScaler(scales=MISSING_SCALES).fit(make_missing_df())
+
+
+def test_missing_values_raise_at_transform_time():
+    complete = pd.DataFrame({"color": ["red", "blue"]}, index=["g1", "g2"])
+    scaler = ConceptualScaler(scales=[NominalScale("color")]).fit(complete)
+
+    with pytest.raises(ValueError, match="NaN"):
+        scaler.transform(pd.DataFrame({"color": [None]}, index=["g9"]))
+
+
+def test_missing_values_never_become_vocabulary():
+    scaler = ConceptualScaler(scales=MISSING_SCALES, missing="false").fit(
+        make_missing_df()
+    )
+
+    assert list(scaler.get_feature_names_out()) == [
+        "color=blue",
+        "color=red",
+        "score>=20",
+        "score>=50",
+    ]
+
+
+def test_missing_false_gives_no_scale_attributes():
+    out = ConceptualScaler(
+        scales=MISSING_SCALES, output="dataframe", missing="false"
+    ).fit_transform(make_missing_df())
+
+    assert out.loc["g3", ["color=blue", "color=red"]].tolist() == [False, False]
+    assert out.loc["g2", ["score>=20", "score>=50"]].tolist() == [False, False]
+    assert out.loc["g3", ["score>=20", "score>=50"]].tolist() == [True, True]
+
+
+def test_missing_unknown_dataframe_uses_float_nan():
+    out = ConceptualScaler(
+        scales=MISSING_SCALES, output="dataframe", missing="unknown"
+    ).fit_transform(make_missing_df())
+
+    assert all(dtype == float for dtype in out.dtypes)
+    assert out.loc["g3", ["color=blue", "color=red"]].isna().all()
+    assert out.loc["g2", ["score>=20", "score>=50"]].isna().all()
+    assert out.loc["g1", "color=red"] == 1.0
+
+
+def test_missing_unknown_array_uses_nan():
+    out = ConceptualScaler(scales=MISSING_SCALES, missing="unknown").fit_transform(
+        make_missing_df()
+    )
+
+    assert out.dtype == float
+    assert np.isnan(out[2, :2]).all()
+    assert out[0].tolist()[:2] == [0.0, 1.0]
+
+
+def test_missing_unknown_context_output_is_incomplete_context():
+    from conceptflow import IncompleteContext
+
+    ctx = ConceptualScaler(
+        scales=MISSING_SCALES, output="context", missing="unknown"
+    ).fit_transform(make_missing_df())
+
+    assert isinstance(ctx, IncompleteContext)
+    assert ctx.n_unknown == 4
+
+
+def test_missing_policy_validation():
+    with pytest.raises(ValueError, match="missing"):
+        ConceptualScaler(scales=MISSING_SCALES, missing="drop").fit(make_missing_df())
+
+    with pytest.raises(ValueError, match="sparse"):
+        ConceptualScaler(
+            scales=MISSING_SCALES, output="sparse", missing="unknown"
+        ).fit(make_missing_df())

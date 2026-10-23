@@ -4,12 +4,12 @@ Sklearn-compatible Duquenne-Guigues (stem) basis estimator.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted
 
+from conceptflow.algorithms._membership import contains_sets
 from conceptflow.algorithms.implications import Implication, compute_canonical_basis
 from conceptflow.validation import check_binary_context_input
 
@@ -84,14 +84,9 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
                 f"{self.n_features_in_} features as input"
             )
 
-        data = [
-            [
-                imp.premise
-                <= frozenset(np.flatnonzero(context.incidence[object_index]).tolist())
-                for imp in self.implications_
-            ]
-            for object_index in range(context.n_objects)
-        ]
+        data = contains_sets(
+            context.incidence, [imp.premise for imp in self.implications_]
+        )
 
         output_df = pd.DataFrame(
             data,
@@ -125,4 +120,7 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
         tags.input_tags.sparse = True
+        # Outputs are boolean membership indicators (or 0/1/NaN floats),
+        # whatever the input dtype; tell sklearn not to expect preservation.
+        tags.transformer_tags.preserves_dtype = []
         return tags

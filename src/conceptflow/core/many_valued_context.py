@@ -33,8 +33,8 @@ extensible.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -213,11 +213,17 @@ class ManyValuedContext:
     def unique_values(self, attr: str) -> set[Any]:
         """
         Return unique values of one attribute.
+
+        Missing entries (None, NaN, ``pd.NA``, ``"?"``; see
+        ``conceptflow.core.incomplete_context.is_missing``) are not values
+        and are left out.
         """
+        from conceptflow.core.incomplete_context import is_missing
+
         if attr not in self.attributes:
             raise KeyError(f'Unknown attribute "{attr}".')
 
-        return set(self.data[attr].unique())
+        return {value for value in self.data[attr].unique() if not is_missing(value)}
 
     def restrict_objects(
         self,

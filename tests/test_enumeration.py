@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from conceptflow import Concept, FormalContext
 from conceptflow.algorithms.enumeration import (
@@ -81,3 +82,22 @@ def test_closebyone_matches_bruteforce_and_nextclosure():
 
     assert close_by_one == brute_force
     assert close_by_one == next_closure
+
+@pytest.mark.parametrize("seed", range(10))
+def test_closebyone_pruning_keeps_exactly_the_frequent_concepts(seed):
+    from conceptflow.algorithms._bitset import BitsetContext, to_indices
+    from conceptflow.algorithms.enumeration import (
+        _closebyone_bitsets,
+        enumerate_concepts_bruteforce,
+    )
+
+    rng = np.random.default_rng(seed)
+    ctx = FormalContext.from_array(rng.random((12, 6)) < 0.5)
+    everything = enumerate_concepts_bruteforce(ctx)
+
+    for threshold in range(0, 14):
+        pruned = _closebyone_bitsets(BitsetContext(ctx), min_extent_size=threshold)
+        expected = {
+            (c.extent, c.intent) for c in everything if len(c.extent) >= threshold
+        }
+        assert {(to_indices(e), to_indices(i)) for e, i in pruned} == expected

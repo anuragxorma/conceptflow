@@ -9,6 +9,7 @@ from conceptflow.core import (
     Concept,
     ConceptLattice,
     FormalContext,
+    IncompleteContext,
     ManyValuedContext,
 )
 from conceptflow.visualization import (
@@ -28,6 +29,7 @@ __all__ = [
     "__version__",
     "Concept",
     "FormalContext",
+    "IncompleteContext",
     "ManyValuedContext",
     "ConceptLattice",
     "GraphData",

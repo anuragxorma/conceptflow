@@ -8,7 +8,13 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from conceptflow.core import FormalContext
+from conceptflow.core import FormalContext, IncompleteContext
+
+_UNKNOWN_HINT = (
+    "Binary-context estimators need complete data. Choose a completion with "
+    "IncompleteContext.certain_context() / .possible_context(), or scale with "
+    'ConceptualScaler(missing="false").'
+)
 
 
 def check_binary_context_input(X) -> FormalContext:
@@ -25,7 +31,18 @@ def check_binary_context_input(X) -> FormalContext:
     if isinstance(X, FormalContext):
         return X
 
+    if isinstance(X, IncompleteContext):
+        if X.is_complete:
+            return X.certain_context()
+        raise ValueError(f"Input contains NaN: the context has unknown entries. {_UNKNOWN_HINT}")
+
     if isinstance(X, pd.DataFrame):
+        if X.isna().to_numpy().any():
+            raise ValueError(
+                "Input contains NaN: missing entries. If empty cells mean "
+                '"no cross", pass FormalContext.from_dataframe(X) instead. '
+                f"For unknown entries: {_UNKNOWN_HINT}"
+            )
         return FormalContext.from_dataframe(X)
 
     if sparse.issparse(X):

@@ -24,6 +24,48 @@ import numpy as np
 import pandas as pd
 
 
+def _is_index(value) -> bool:
+    """Whether ``value`` is an integer index (Python or NumPy), not a name."""
+    return isinstance(value, (int, np.integer)) and not isinstance(value, (bool, np.bool_))
+
+
+def _cross_table(data) -> np.ndarray:
+    """
+    Convert incidence data to a boolean cross table.
+
+    Empty cells (None, NaN, ``pd.NA``) mean "no cross", as in a printed cross
+    table. They must not go through ``bool()`` directly: ``bool(NaN)`` is
+    True. The marker ``"?"`` means "unknown", which a formal context cannot
+    express, so it is rejected in favour of IncompleteContext.
+    """
+    raw = np.asarray(data)
+
+    if raw.dtype == bool:
+        # Copy, so later changes to the caller's array cannot alter a frozen
+        # context.
+        return raw.copy()
+
+    if raw.dtype.kind in "US":
+        has_unknown = bool((raw == ("?" if raw.dtype.kind == "U" else b"?")).any())
+    elif raw.dtype == object:
+        has_unknown = any(isinstance(v, str) and v == "?" for v in raw.flat)
+    else:
+        has_unknown = False
+
+    if has_unknown:
+        raise ValueError(
+            'Incidence contains the unknown marker "?". A FormalContext has '
+            "only crosses and non-crosses; use IncompleteContext for unknown "
+            "entries."
+        )
+
+    empty = pd.isna(raw)
+    if empty.any():
+        raw = np.where(empty, False, raw)
+
+    return raw.astype(bool)
+
+
 @dataclass(frozen=True)
 class FormalContext:
     """
@@ -60,7 +102,7 @@ class FormalContext:
         if len(set(self.attributes)) != len(self.attributes):
             raise ValueError("Attribute names must be unique.")
 
-        incidence = np.asarray(self.incidence, dtype=bool)
+        incidence = _cross_table(self.incidence)
 
         expected_shape = (len(self.objects), len(self.attributes))
         if incidence.shape != expected_shape:
@@ -98,13 +140,13 @@ class FormalContext:
         """
         Create a formal context from a pandas DataFrame.
 
-        The DataFrame must represent a binary context.
-        Values are converted to boolean.
+        The DataFrame must represent a binary context. Values are converted
+        to boolean; empty cells (None, NaN, ``pd.NA``) mean "no cross".
         """
         return cls(
             objects=tuple(map(str, data.index)),
             attributes=tuple(map(str, data.columns)),
-            incidence=data.to_numpy(dtype=bool),
+            incidence=data.to_numpy(),
         )
 
     @classmethod
@@ -117,7 +159,7 @@ class FormalContext:
         """
         Create a formal context from an array-like binary matrix.
         """
-        array = np.asarray(data, dtype=bool)
+        array = np.asarray(data)
 
         if array.ndim != 2:
             raise ValueError("Formal context data must be two-dimensional.")
@@ -162,8 +204,8 @@ class FormalContext:
         resolved: list[int] = []
 
         for obj in objects:
-            if isinstance(obj, int):
-                resolved.append(obj)
+            if _is_index(obj):
+                resolved.append(int(obj))
             else:
                 resolved.append(object_to_index[obj])
 
@@ -187,8 +229,8 @@ class FormalContext:
         resolved: list[int] = []
 
         for attr in attributes:
-            if isinstance(attr, int):
-                resolved.append(attr)
+            if _is_index(attr):
+                resolved.append(int(attr))
             else:
                 resolved.append(attribute_to_index[attr])
 

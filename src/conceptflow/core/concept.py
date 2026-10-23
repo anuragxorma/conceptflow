@@ -7,8 +7,9 @@ intent such that A' = B and B' = A.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
+import operator
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, order=True)
@@ -29,8 +30,15 @@ class Concept:
     intent: frozenset[int]
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "extent", frozenset(self.extent))
-        object.__setattr__(self, "intent", frozenset(self.intent))
+        # operator.index turns numpy integers into Python ints (and rejects
+        # floats), so concepts built from np.flatnonzero etc. hash, compare
+        # and encode as bitsets exactly like the ones ConceptFlow computes.
+        object.__setattr__(
+            self, "extent", frozenset(operator.index(i) for i in self.extent)
+        )
+        object.__setattr__(
+            self, "intent", frozenset(operator.index(i) for i in self.intent)
+        )
 
     def signature(self) -> str:
         """
