@@ -43,6 +43,7 @@ def _lower_cover_indices_from_context(
     concepts: tuple[Concept, ...],
     extents: list[int],
     context: FormalContext,
+    upset: bool = False,
 ) -> list[list[int]] | None:
     """
     Lower covers via attribute extents.
@@ -54,6 +55,10 @@ def _lower_cover_indices_from_context(
     Returns ``None`` if some maximal candidate extent is not among
     ``concepts`` -- i.e. ``concepts`` is not the full lattice of
     ``context`` -- so the caller can fall back to the generic algorithm.
+
+    With ``upset=True`` the concepts are known to form an up-set (such as an
+    iceberg lattice): nothing in the set lies below a missing candidate, so
+    missing candidates are simply skipped.
     """
     bits = BitsetContext(context)
     index_of_extent = {extent: i for i, extent in enumerate(extents)}
@@ -83,6 +88,8 @@ def _lower_cover_indices_from_context(
         for candidate in maximal:
             j = index_of_extent.get(candidate)
             if j is None:
+                if upset:
+                    continue
                 return None
             covers.append(j)
 
@@ -127,6 +134,7 @@ def _upper_cover_indices_generic(extents: list[int]) -> list[list[int]]:
 def compute_hasse_edges(
     concepts: Iterable[Concept],
     context: FormalContext | None = None,
+    upset: bool = False,
 ) -> tuple[tuple[Concept, Concept], ...]:
     """
     Compute cover edges of a concept lattice.
@@ -144,6 +152,11 @@ def compute_hasse_edges(
         extents in ``O(|concepts| * |M|)`` set operations. Otherwise a
         generic, roughly quadratic algorithm is used.
 
+    upset:
+        Declare that ``concepts`` form an up-set of the lattice of
+        ``context``, e.g. an iceberg lattice. The fast path then also applies
+        to them.
+
     Returns
     -------
     tuple of tuple
@@ -155,7 +168,7 @@ def compute_hasse_edges(
 
     lower_covers = None
     if context is not None:
-        lower_covers = _lower_cover_indices_from_context(concepts, extents, context)
+        lower_covers = _lower_cover_indices_from_context(concepts, extents, context, upset)
 
     pairs: list[tuple[int, int]] = []
 

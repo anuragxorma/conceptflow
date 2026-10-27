@@ -1,0 +1,94 @@
+site_name: ConceptFlow
+site_description: Formal Concept Analysis for Python, compatible with scikit-learn.
+site_url: https://conceptflow.readthedocs.io/
+repo_url: https://github.com/anuragxorma/conceptflow
+repo_name: anuragxorma/conceptflow
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style anchors (keeping non-ASCII letters), so links in docs
+      # written for GitHub also work here.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_root_heading: true
+            show_source: false
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - User guide:
+      - Formal contexts: guide/contexts.md
+      - Concept lattices: guide/lattices.md
+      - Implications and rules: guide/rules.md
+      - Concept measures: guide/measures.md
+      - Conceptual scaling and missing values: guide/scaling.md
+      - scikit-learn: guide/sklearn.md
+      - Visualization: guide/visualization.md
+      - Nested line diagrams: guide/nested.md
+      - Data quality: guide/quality.md
+      - Ordinal factorization: guide/decomposition.md
+  - Theory:
+      - Nested diagram tutorial: nested_diagram_tutorial.md
+      - Nested diagram construction: nested_diagram_construction.md
+      - Architecture: architecture.md
+  - API reference:
+      - Core: api/core.md
+      - Algorithms: api/algorithms.md
+      - Preprocessing: api/preprocessing.md
+      - Estimators: api/estimators.md
+      - Metrics: api/metrics.md
+      - Data quality: api/quality.md
+      - Input/output: api/io.md
+      - Visualization: api/visualization.md
+      - Exploration: api/exploration.md
+      - Decomposition: api/decomposition.md
+  - Changelog: changelog.md

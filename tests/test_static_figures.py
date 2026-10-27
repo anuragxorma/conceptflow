@@ -56,7 +56,7 @@ def test_plot_nested_matplotlib(tmp_path):
 
 def test_plot_nested_rejects_unknown_backend():
     with pytest.raises(ValueError, match="backend"):
-        plot_nested(make_nested_view(), backend="tikz")
+        plot_nested(make_nested_view(), backend="powerpoint")
 
 
 def test_upright_puts_top_above_bottom():
@@ -98,7 +98,7 @@ def test_chains_do_not_render_blank(data):
 
 def test_layered_layout_handles_very_deep_lattices():
     from conceptflow.visualization.graph_data import GraphData, GraphEdge, GraphNode
-    from conceptflow.visualization.static import _layered_positions
+    from conceptflow.visualization.layered_layout import layered_layout
 
     # Bottom-first node order used to recurse once per level.
     n = 3000
@@ -107,9 +107,10 @@ def test_layered_layout_handles_very_deep_lattices():
     ]
     edges = [GraphEdge(f"n{i + 1}", f"n{i}") for i in range(n - 1)]
 
-    positions = _layered_positions(GraphData(nodes=nodes, edges=edges))
+    laid_out = layered_layout(GraphData(nodes=nodes, edges=edges)).node_map()
 
-    assert positions["n0"][1] > positions[f"n{n - 1}"][1]
+    # Screen coordinates: the top (n0) has the smallest y.
+    assert laid_out["n0"].y < laid_out[f"n{n - 1}"].y
 
 
 def test_label_truncation_and_default_title():

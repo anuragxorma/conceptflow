@@ -96,79 +96,63 @@ def _upright(
     }
 
 
-def _layered_positions(graph_data: GraphData) -> dict[str, tuple[float, float]]:
-    """
-    Simple fallback layout for nodes without coordinates.
-
-    Nodes are placed in rows by their longest-path distance from the top
-    concept, and each row is ordered by the mean x of the nodes above it.
-    """
-    upper: dict[str, list[str]] = {node.node_id: [] for node in graph_data.nodes}
-    for edge in graph_data.edges:
-        upper[edge.source].append(edge.target)
-
-    # Longest-path depth from the top, iteratively (Kahn's algorithm) so
-    # deep lattices cannot hit the recursion limit.
-    lower: dict[str, list[str]] = {node_id: [] for node_id in upper}
-    for node_id, ups in upper.items():
-        for u in ups:
-            lower[u].append(node_id)
-
-    remaining = {node_id: len(ups) for node_id, ups in upper.items()}
-    level: dict[str, int] = {}
-    frontier = [node_id for node_id, n in remaining.items() if n == 0]
-    while frontier:
-        node_id = frontier.pop()
-        level[node_id] = 1 + max((level[u] for u in upper[node_id]), default=-1)
-        for low in lower[node_id]:
-            remaining[low] -= 1
-            if remaining[low] == 0:
-                frontier.append(low)
-
-    rows: dict[int, list[str]] = {}
-    for node in graph_data.nodes:
-        rows.setdefault(level[node.node_id], []).append(node.node_id)
-
-    x: dict[str, float] = {}
-    for row_index in sorted(rows):
-        row = rows[row_index]
-        row.sort(
-            key=lambda n: (
-                sum(x[u] for u in upper[n]) / len(upper[n]) if upper[n] else 0.0
-            )
-        )
-        for i, node_id in enumerate(row):
-            x[node_id] = i - (len(row) - 1) / 2
-
-    return {node_id: (x[node_id], -float(level[node_id])) for node_id in x}
-
-
 def _reduced_labels(graph_data: GraphData) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """
-    Reduced labelling: attribute m at the largest concept containing m in
-    its intent, object g at the smallest concept containing g in its extent.
+    Reduced labelling: attribute m at μ(m), the largest concept with m in its
+    intent; object g at γ(g), the smallest concept with g in its extent.
+
+    A label is placed only where that concept is drawn: on an iceberg
+    lattice γ(g) may lie below the iceberg (g then belongs to several
+    minimal drawn concepts), and the label is left out, as in the Graphviz
+    export.
     """
     attributes_at: dict[str, list[str]] = {node.node_id: [] for node in graph_data.nodes}
     objects_at: dict[str, list[str]] = {node.node_id: [] for node in graph_data.nodes}
 
-    best_attr: dict[str, Any] = {}
-    best_obj: dict[str, Any] = {}
-
+    containing: dict[str, list] = {}
+    having: dict[str, list] = {}
     for node in graph_data.nodes:
-        size = node.metadata["extent_size"]
-        for name in node.metadata["intent"]:
-            if name not in best_attr or size > best_attr[name][0]:
-                best_attr[name] = (size, node.node_id)
-        for name in node.metadata["extent"]:
-            if name not in best_obj or size < best_obj[name][0]:
-                best_obj[name] = (size, node.node_id)
+        extent = frozenset(node.metadata["extent"])
+        intent = frozenset(node.metadata["intent"])
+        for name in extent:
+            containing.setdefault(name, []).append((extent, node.node_id))
+        for name in intent:
+            having.setdefault(name, []).append((intent, node.node_id))
 
-    for name, (_, node_id) in best_attr.items():
-        attributes_at[node_id].append(name)
-    for name, (_, node_id) in best_obj.items():
-        objects_at[node_id].append(name)
+    for name, nodes in containing.items():
+        smallest, node_id = min(nodes, key=lambda item: len(item[0]))
+        if all(smallest <= extent for extent, _ in nodes):
+            objects_at[node_id].append(name)
+
+    for name, nodes in having.items():
+        smallest, node_id = min(nodes, key=lambda item: len(item[0]))
+        if all(smallest <= intent for intent, _ in nodes):
+            attributes_at[node_id].append(name)
 
     return attributes_at, objects_at
+
+
+def _lattice_positions(graph_data: GraphData):
+    """
+    Upright math coordinates (y up) for a lattice drawing.
+
+    Nodes without coordinates get the layered layout first. Returns the
+    (possibly laid-out) GraphData and a dict node id -> (x, y).
+    """
+    if any(node.x is None or node.y is None for node in graph_data.nodes):
+        from conceptflow.visualization.layered_layout import layered_layout
+
+        graph_data = layered_layout(graph_data)
+
+    from conceptflow.visualization.graph_data import needs_rotation
+
+    positions = {
+        node.node_id: _math_coordinates(node.x, node.y) for node in graph_data.nodes
+    }
+    if not needs_rotation(graph_data):
+        return graph_data, positions
+    by_size = sorted(graph_data.nodes, key=lambda n: n.metadata["extent_size"])
+    return graph_data, _upright(positions, by_size[-1].node_id, by_size[0].node_id)
 
 
 def render_lattice_matplotlib(
@@ -200,14 +184,7 @@ def render_lattice_matplotlib(
 
     fig, ax = _new_axes(ax, figsize)
 
-    if any(node.x is None or node.y is None for node in graph_data.nodes):
-        positions = _layered_positions(graph_data)
-    else:
-        positions = {
-            node.node_id: _math_coordinates(node.x, node.y) for node in graph_data.nodes
-        }
-        by_size = sorted(graph_data.nodes, key=lambda n: n.metadata["extent_size"])
-        positions = _upright(positions, by_size[-1].node_id, by_size[0].node_id)
+    graph_data, positions = _lattice_positions(graph_data)
 
     segments = [
         (positions[edge.source], positions[edge.target]) for edge in graph_data.edges
@@ -274,6 +251,60 @@ def _normalized_template(template: dict[str, Any]) -> dict[str, tuple[float, flo
     }
 
 
+def _nested_geometry(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Shared geometry of a two-level nested diagram (math coordinates, y up).
+
+    Returns a dict with ``bubble`` (outer circle radius), ``centers`` (outer
+    id -> centre), ``outer_segments`` (outer edges clipped at the circles),
+    ``template`` (inner template or None), ``inner_places`` (outer id ->
+    inner id -> position) and ``top_id`` (the outer top concept).
+    """
+    outer_nodes = data["nodes"]
+    template = data.get("inner_template")
+    by_size = sorted(outer_nodes, key=lambda n: n["metadata"]["extent_size"])
+    outer_positions = _upright(
+        {node["id"]: _math_coordinates(node["x"], node["y"]) for node in outer_nodes},
+        by_size[-1]["id"],
+        by_size[0]["id"],
+    )
+
+    # Scale outer coordinates so neighbouring circles never overlap.
+    points = list(outer_positions.values())
+    distances = [math.dist(p, q) for i, p in enumerate(points) for q in points[i + 1:]]
+    bubble = 1.0
+    spread = (2.6 * bubble / min(distances)) if distances and min(distances) > 0 else 1.0
+    centers = {nid: (x * spread, y * spread) for nid, (x, y) in outer_positions.items()}
+
+    outer_segments = []
+    for edge in data["edges"]:
+        (x1, y1), (x2, y2) = centers[edge["source"]], centers[edge["target"]]
+        length = math.hypot(x2 - x1, y2 - y1) or 1.0
+        ux, uy = (x2 - x1) / length, (y2 - y1) / length
+        outer_segments.append(
+            ((x1 + ux * bubble, y1 + uy * bubble), (x2 - ux * bubble, y2 - uy * bubble))
+        )
+
+    inner_unit = _normalized_template(template) if template else {}
+    inner_scale = 0.78 * bubble
+    inner_places = {
+        node_id: {
+            iid: (cx + ux * inner_scale, cy + uy * inner_scale)
+            for iid, (ux, uy) in inner_unit.items()
+        }
+        for node_id, (cx, cy) in centers.items()
+    }
+
+    return {
+        "bubble": bubble,
+        "centers": centers,
+        "outer_segments": outer_segments,
+        "template": template,
+        "inner_places": inner_places,
+        "top_id": by_size[-1]["id"],
+    }
+
+
 def render_nested_matplotlib(
     data: dict[str, Any],
     ax=None,
@@ -305,39 +336,13 @@ def render_nested_matplotlib(
 
     fig, ax = _new_axes(ax, figsize)
 
-    outer_nodes = data["nodes"]
-    template = data.get("inner_template")
-    by_size = sorted(outer_nodes, key=lambda n: n["metadata"]["extent_size"])
-    outer_positions = _upright(
-        {node["id"]: _math_coordinates(node["x"], node["y"]) for node in outer_nodes},
-        by_size[-1]["id"],
-        by_size[0]["id"],
+    geometry = _nested_geometry(data)
+    outer_nodes, template = data["nodes"], geometry["template"]
+    bubble, centers, top_id = geometry["bubble"], geometry["centers"], geometry["top_id"]
+
+    ax.add_collection(
+        LineCollection(geometry["outer_segments"], colors="black", linewidths=1.6, zorder=1)
     )
-
-    # Scale outer coordinates so neighbouring circles never overlap.
-    distances = [
-        math.dist(p, q)
-        for i, p in enumerate(outer_positions.values())
-        for q in list(outer_positions.values())[i + 1:]
-    ]
-    bubble = 1.0
-    spread = (2.6 * bubble / min(distances)) if distances and min(distances) > 0 else 1.0
-    centers = {nid: (x * spread, y * spread) for nid, (x, y) in outer_positions.items()}
-
-    # Outer edges, clipped at the circle boundaries.
-    outer_segments = []
-    for edge in data["edges"]:
-        (x1, y1), (x2, y2) = centers[edge["source"]], centers[edge["target"]]
-        length = math.hypot(x2 - x1, y2 - y1) or 1.0
-        ux, uy = (x2 - x1) / length, (y2 - y1) / length
-        outer_segments.append(
-            ((x1 + ux * bubble, y1 + uy * bubble), (x2 - ux * bubble, y2 - uy * bubble))
-        )
-    ax.add_collection(LineCollection(outer_segments, colors="black", linewidths=1.6, zorder=1))
-
-    inner_unit = _normalized_template(template) if template else {}
-    inner_scale = 0.78 * bubble
-    top_id = by_size[-1]["id"]
 
     for node in outer_nodes:
         cx, cy = centers[node["id"]]
@@ -361,10 +366,7 @@ def render_nested_matplotlib(
                 )
             continue
 
-        place = {
-            iid: (cx + ux * inner_scale, cy + uy * inner_scale)
-            for iid, (ux, uy) in inner_unit.items()
-        }
+        place = geometry["inner_places"][node["id"]]
         ax.add_collection(
             LineCollection(
                 [(place[e["source"]], place[e["target"]]) for e in template["edges"]],

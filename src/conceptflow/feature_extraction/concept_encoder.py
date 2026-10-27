@@ -15,6 +15,7 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.core import ConceptLattice as CoreConceptLattice
 from conceptflow.validation import check_binary_context_input
+from conceptflow.validation.input import check_feature_names, remember_feature_names
 
 
 class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
@@ -89,6 +90,7 @@ class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
             use ``ConceptMembershipEncoder.from_lattice(lattice)`` instead.
         """
         context = check_binary_context_input(X)
+        remember_feature_names(self, X)
         lattice = CoreConceptLattice.from_context(
             context,
             algorithm=self.algorithm,
@@ -116,6 +118,7 @@ class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
         """
         check_is_fitted(self, "concepts_")
 
+        check_feature_names(self, X)
         context = check_binary_context_input(X)
 
         if context.n_attributes != self.n_features_in_:

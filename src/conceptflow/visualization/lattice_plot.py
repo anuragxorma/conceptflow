@@ -9,8 +9,8 @@ from conceptflow.visualization.d3_backend import render_with_d3
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.graph_data import lattice_to_graph_data
 
-SUPPORTED_BACKENDS = {"graph_data", "d3", "matplotlib"}
-SUPPORTED_LAYOUTS = {"none", "dimflux"}
+SUPPORTED_BACKENDS = {"graph_data", "d3", "matplotlib", "graphviz", "tikz"}
+SUPPORTED_LAYOUTS = {"none", "dimflux", "layered"}
 
 
 def plot_lattice(
@@ -39,15 +39,23 @@ def plot_lattice(
         - "matplotlib": return a static matplotlib Figure; write it with
           ``fig.savefig("lattice.pdf")`` (or .svg/.png/.eps). Requires
           matplotlib.
+        - "graphviz": return a GraphvizFigure (DOT text; ``.write("x.pdf")``
+          renders it if Graphviz is installed). Graphviz computes its own
+          layout, so ``layout`` is ignored.
+        - "tikz": return a TikZFigure (``.source`` is a ``tikzpicture``;
+          ``.write("x.tex")`` saves a standalone document, ``.write("x.pdf")``
+          compiles it if LaTeX is installed). Uses ``layout``.
         - "graph_data": return backend-neutral GraphData.
 
     layout:
         Layout strategy.
 
-        - "dimflux": compute DimFlux coordinates.
-        - "none": do not assign coordinates. The matplotlib backend then
-          uses a quick layered layout, which is useful for lattices too
-          large for DimFlux.
+        - "dimflux": DimFlux coordinates (additive drawing; best for
+          small lattices, slow above ~150 concepts).
+        - "layered": a fast layered (Sugiyama-style) layout, usable for
+          tens of thousands of concepts.
+        - "none": no coordinates. Renderers that need them (matplotlib)
+          fall back to the layered layout.
 
     stable_ids:
         Whether to use stable concept ids instead of local node ids.
@@ -78,19 +86,28 @@ def plot_lattice(
     if backend not in SUPPORTED_BACKENDS:
         raise ValueError(
             f'Unknown visualization backend "{backend}". '
-            'Use "graph_data", "d3" or "matplotlib".'
+            'Use "graph_data", "d3", "matplotlib", "graphviz" or "tikz".'
         )
 
     if layout not in SUPPORTED_LAYOUTS:
         raise ValueError(
-            f'Unknown layout "{layout}". Use "none" or "dimflux".'
+            f'Unknown layout "{layout}". Use "dimflux", "layered" or "none".'
         )
+
+    if backend == "graphviz":
+        from conceptflow.visualization.graphviz import GraphvizFigure, lattice_to_dot
+
+        return GraphvizFigure(lattice_to_dot(lattice, title=title, **kwargs))
 
     if layout == "none":
         graph_data = lattice_to_graph_data(
             lattice,
             stable_ids=stable_ids,
         )
+    elif layout == "layered":
+        from conceptflow.visualization.layered_layout import layered_layout
+
+        graph_data = layered_layout(lattice_to_graph_data(lattice, stable_ids=stable_ids))
     else:
         graph_data = lattice_to_graph_data_dimflux(
             lattice,
@@ -100,6 +117,11 @@ def plot_lattice(
 
     if backend == "graph_data":
         return graph_data
+
+    if backend == "tikz":
+        from conceptflow.visualization.tikz import TikZFigure, graph_data_to_tikz
+
+        return TikZFigure(graph_data_to_tikz(graph_data, title=title, **kwargs))
 
     if backend == "matplotlib":
         from conceptflow.visualization.static import render_lattice_matplotlib

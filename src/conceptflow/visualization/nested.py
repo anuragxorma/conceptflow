@@ -1479,7 +1479,7 @@ renderView(rootData);
 """
 
 def plot_nested(
-    view: ExplorationView,
+    view,
     mode: str = "navigator",
     show_child_previews: bool = True,
     width: int = 900,
@@ -1488,10 +1488,16 @@ def plot_nested(
     object_label: Callable[[str], str] | None = None,
     backend: str = "d3",
     timeout_ms: int | None = 1000,
+    inner=None,
     **kwargs,
 ):
     """
     Plot a nested exploration view with subdirect decomposition.
+
+    ``view`` is an ExplorationView, or a FormalContext together with
+    ``inner=`` another FormalContext over the same objects: then the nested
+    diagram of the two contexts is drawn (see
+    ``conceptflow.exploration.nested_view``).
 
     Parameters
     ----------
@@ -1506,6 +1512,8 @@ def plot_nested(
         - "matplotlib": static matplotlib Figure of the first nesting level;
           write it with ``fig.savefig("nested.pdf")``. Only the levels it
           draws are laid out, so it is faster than "d3" on deep trees.
+        - "tikz": TikZFigure of the first nesting level (``.write("x.tex")``
+          or ``.write("x.pdf")``).
     timeout_ms:
         DimFlux time limit per layout; see ``lattice_to_graph_data_dimflux``.
     **kwargs:
@@ -1521,15 +1529,35 @@ def plot_nested(
             f'Unknown nested visualization mode "{mode}". '
             'Currently only "navigator" is supported.'
         )
-    if backend not in {"d3", "matplotlib"}:
+    if backend not in {"d3", "matplotlib", "tikz"}:
         raise ValueError(
             f'Unknown nested visualization backend "{backend}". '
-            'Use "d3" or "matplotlib".'
+            'Use "d3", "matplotlib" or "tikz".'
         )
-    if backend == "matplotlib":
+
+    from conceptflow.core import FormalContext
+
+    if inner is not None:
+        from conceptflow.exploration.combinations import nested_view
+
+        if not isinstance(view, FormalContext) or not isinstance(inner, FormalContext):
+            raise TypeError("With inner=..., both arguments must be FormalContexts.")
+        view = nested_view(view, inner)
+    elif not isinstance(view, ExplorationView):
+        raise TypeError(
+            "plot_nested needs an ExplorationView, or two FormalContexts: "
+            "plot_nested(outer_context, inner=inner_context)."
+        )
+    if backend in {"matplotlib", "tikz"}:
         data = exploration_view_to_nested_data(
             view, object_label=object_label, timeout_ms=timeout_ms, max_depth=1
         )
+
+        if backend == "tikz":
+            from conceptflow.visualization.tikz import TikZFigure, nested_data_to_tikz
+
+            return TikZFigure(nested_data_to_tikz(data, title=title, **kwargs))
+
         from conceptflow.visualization.static import render_nested_matplotlib
 
         return render_nested_matplotlib(data, title=title, **kwargs)

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from conceptflow.core import Concept, ConceptLattice
+from conceptflow.core import Concept, ConceptLattice, FormalContext
 from conceptflow.exploration.view import ExplorationView
 
 
@@ -148,3 +148,56 @@ def nested_combinations(
             )
 
     return pd.DataFrame(rows)
+
+
+def nested_view(
+    outer: FormalContext,
+    inner: FormalContext,
+    outer_name: str = "outer",
+    inner_name: str = "inner",
+    algorithm: str = "nextclosure",
+) -> ExplorationView:
+    """
+    Build a two-level ExplorationView from two contexts over the same objects.
+
+    The outer lattice is built from ``outer``; its top concept gets ``inner``
+    (over all objects) as its child view. That is exactly what a two-level
+    nested diagram draws -- every outer concept shows the same inner
+    lattice, filled where combinations occur -- so no per-concept inner
+    lattices are built. Use ExplorationBuilder for deeper nesting.
+
+    Objects are matched by name; attribute names must not overlap.
+    """
+    if set(outer.objects) != set(inner.objects) or outer.n_objects != inner.n_objects:
+        raise ValueError("outer and inner must have the same objects.")
+
+    overlap = set(outer.attributes) & set(inner.attributes)
+    if overlap:
+        raise ValueError(
+            "outer and inner attributes must be disjoint, but these appear in "
+            f"both: {sorted(overlap)}. Rename them, e.g. with context.rename()."
+        )
+
+    inner = inner.subcontext(objects=list(outer.objects))
+    root = ExplorationView(
+        name=outer_name,
+        context=outer,
+        lattice=ConceptLattice.from_context(outer, algorithm=algorithm),
+        depth=0,
+        scale_names=(outer_name,),
+    )
+
+    top = root.lattice.top()
+    root.add_child(
+        top.stable_id(),
+        ExplorationView(
+            name=inner_name,
+            context=inner,
+            lattice=ConceptLattice.from_context(inner, algorithm=algorithm),
+            depth=1,
+            scale_names=(inner_name,),
+            parent_concept_id=top.stable_id(),
+        ),
+    )
+
+    return root

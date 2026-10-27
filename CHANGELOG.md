@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+### Added
+
+- **Documentation site** (MkDocs, in `docs/`): getting started, a user guide
+  with one page per topic, the theory documents, an API reference generated
+  from the docstrings, and this changelog. Every code example in the guide is
+  run by the test suite. The README is now a short overview.
+- **Lattice navigation** on `ConceptLattice`: `join`, `meet`, `upset`,
+  `downset`, `atoms`, `coatoms`, `object_concept` (γ), `attribute_concept`
+  (μ), `concept_from_objects`, `concept_from_attributes`.
+- **Iceberg lattices:** `min_support=` on `ConceptLattice.from_context`,
+  `enumerate_concepts` and `ConceptLatticeEstimator`; only frequent concepts
+  are enumerated.
+- **Size guard:** a `LargeLatticeWarning` once an enumeration passes 50,000
+  concepts (computation continues), and an opt-in `max_concepts=` that stops
+  with `ConceptLimitExceeded`.
+- **Concept measures** in `conceptflow.metrics`: exact `concept_stability`,
+  `stability_bounds`, `delta_measure`, `concept_entropy`,
+  `concept_information_gain`, `linearity_index`, `distributivity_index`.
+- `ConceptLatticeEstimator(select=..., n_concepts=...)` keeps the most stable
+  (or highest-Δ, or largest) concepts as features.
+- `compute_minimal_generators` (keys) and `compute_proper_premise_basis`
+  (canonical direct basis).
+- **Context handling:** `FormalContext.transpose`, `subcontext`, `rename`,
+  `add_objects`, `add_attributes`, `remove_objects`, `remove_attributes`;
+  `reduce_context` (full reduction); JSON (FCART/fcapy layout) and CSV
+  input/output.
+- **Context operations** (`conceptflow.core`): `apposition`, `subposition`,
+  `direct_sum`, `direct_product`, `complement`, `dual`; `nested_view` and
+  `plot_nested(context, inner=other_context)` draw the nested diagram of any
+  two contexts over the same objects.
+- **Layouts and export:** `layout="layered"` (Sugiyama-style, for large
+  lattices), `backend="tikz"` (TikZ/LaTeX, for lattices and nested diagrams)
+  and `backend="graphviz"` (DOT).
+- **Data quality** (`conceptflow.quality`): `check_implications`,
+  `redundancy_report`, `explain_object`, `explain_rule`.
+- `ImplicationOutlierDetector`: a scikit-learn outlier detector that flags
+  objects breaking strong implications and explains each flag.
+
+### Changed
+
+- Cell values are read by one rule per cell, whatever the type of the table:
+  numbers greater than 0 are crosses (previously any non-zero value; 0/1 data
+  and counts are unaffected, ±1-encoded data now reads -1 as absent), and
+  strings must be a known spelling (`"1"`, `"true"`, `"x"` / `"0"`,
+  `"false"`, `"."`, `""`) — anything else, such as `"yes"`/`"no"`, raises
+  instead of being guessed. Previously a string's meaning could depend on the
+  other cells of the table.
+- Integer object/attribute indices are range-checked everywhere (negative or
+  too large indices raise `IndexError` instead of being ignored or wrapping
+  around).
+- Estimators fitted on named columns refuse input with different or
+  reordered columns, as scikit-learn's estimators do.
+- `plot_lattice(layout="none")` with matplotlib uses the new layered layout.
+- `ConceptualScaler` declares string input support to scikit-learn, and all
+  transformers declare that they do not preserve the input dtype; only one
+  scikit-learn check remains an expected failure (see the scikit-learn
+  guide).
+
 ## 0.2.0 (2026-10-23)
 
 ### Breaking changes

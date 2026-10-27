@@ -16,6 +16,9 @@ the first FCA-native enumeration algorithm used by ConceptFlow.
 
 from __future__ import annotations
 
+import numbers
+import os
+import warnings
 from collections.abc import Iterable
 from itertools import chain, combinations
 
@@ -65,6 +68,83 @@ def enumerate_concepts_bruteforce(context: FormalContext) -> list[Concept]:
     )
 
 
+# Warnings are attributed to the first stack frame outside ConceptFlow (and
+# scikit-learn, so warnings raised inside a Pipeline point at user code).
+_PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep
+
+
+def _internal_prefixes() -> tuple[str, ...]:
+    prefixes = [_PACKAGE_DIR]
+    try:
+        import sklearn
+
+        prefixes.append(os.path.dirname(os.path.abspath(sklearn.__file__)) + os.sep)
+    except ImportError:  # pragma: no cover - sklearn is a dependency
+        pass
+    return tuple(prefixes)
+
+
+_INTERNAL_PREFIXES = _internal_prefixes()
+
+# Enumerations warn once when they pass this many concepts (see _SizeGuard).
+LARGE_LATTICE_WARNING_SIZE = 50_000
+
+
+class LargeLatticeWarning(UserWarning):
+    """Emitted while enumerating a lattice that is becoming very large."""
+
+
+class ConceptLimitExceeded(ValueError):
+    """Raised when an enumeration exceeds an explicit ``max_concepts`` limit."""
+
+
+class _SizeGuard:
+    """
+    Watches the number of concepts produced by an enumeration.
+
+    Nothing changes by default: past ``LARGE_LATTICE_WARNING_SIZE`` concepts a
+    single warning names the opt-in options, and the enumeration continues.
+    Only an explicit ``max_concepts`` stops it.
+    """
+
+    def __init__(self, max_concepts: int | None = None) -> None:
+        if max_concepts is not None and (
+            isinstance(max_concepts, bool)
+            or not isinstance(max_concepts, numbers.Integral)
+            or max_concepts < 1
+        ):
+            raise ValueError("max_concepts must be None or a positive integer.")
+        self.max_concepts = None if max_concepts is None else int(max_concepts)
+        self.count = 0
+        self.warned = False
+
+    def tick(self) -> None:
+        self.count += 1
+
+        if self.max_concepts is not None and self.count > self.max_concepts:
+            raise ConceptLimitExceeded(
+                f"The lattice has more than max_concepts={self.max_concepts} "
+                "concepts. Use min_support=... to compute only frequent "
+                "concepts, or raise max_concepts."
+            )
+
+        # With an explicit max_concepts the user has already decided.
+        if (
+            not self.warned
+            and self.max_concepts is None
+            and self.count > LARGE_LATTICE_WARNING_SIZE
+        ):
+            self.warned = True
+            warnings.warn(
+                f"The concept lattice has more than {LARGE_LATTICE_WARNING_SIZE:,} "
+                "concepts and is still growing. Computation continues. To limit "
+                "it, use min_support=... (only concepts with at least that many "
+                "objects) or max_concepts=... (stop with an error past a limit).",
+                LargeLatticeWarning,
+                skip_file_prefixes=_INTERNAL_PREFIXES,
+            )
+
+
 def _intent_of(extent: int, columns: list[int]) -> int:
     """A' for an object bitset A: attributes whose column contains A."""
     intent = 0
@@ -78,7 +158,11 @@ def _to_concept(extent: int, intent: int) -> Concept:
     return Concept(extent=to_indices(extent), intent=to_indices(intent))
 
 
-def enumerate_concepts_nextclosure(context: FormalContext) -> list[Concept]:
+def enumerate_concepts_nextclosure(
+    context: FormalContext,
+    *,
+    _guard: _SizeGuard | None = None,
+) -> list[Concept]:
     """
     Enumerate all formal concepts using the NextClosure algorithm.
 
@@ -89,6 +173,7 @@ def enumerate_concepts_nextclosure(context: FormalContext) -> list[Concept]:
     bits = BitsetContext(context)
     columns = bits.columns
     n_attributes = bits.n_attributes
+    guard = _guard or _SizeGuard()
 
     def close(attributes: int) -> tuple[int, int]:
         extent = bits.extent(attributes)
@@ -99,6 +184,7 @@ def enumerate_concepts_nextclosure(context: FormalContext) -> list[Concept]:
 
     while current is not None:
         extent, intent = current
+        guard.tick()
         concepts.append(_to_concept(extent, intent))
 
         current = None
@@ -124,6 +210,7 @@ def enumerate_concepts_nextclosure(context: FormalContext) -> list[Concept]:
 def _closebyone_bitsets(
     bits: BitsetContext,
     min_extent_size: int = 0,
+    guard: _SizeGuard | None = None,
 ) -> list[tuple[int, int]]:
     """
     Close-by-One on integer bitsets; returns ``(extent, intent)`` pairs.
@@ -137,13 +224,19 @@ def _closebyone_bitsets(
     n_attributes = bits.n_attributes
 
     if bits.n_objects < min_extent_size:
-        return []
+        # Not even the top concept is frequent; it is still returned, so an
+        # iceberg lattice always has its top.
+        if guard is not None:
+            guard.tick()
+        return [(bits.all_objects, _intent_of(bits.all_objects, columns))]
 
     found: list[tuple[int, int]] = []
     stack = [(bits.all_objects, _intent_of(bits.all_objects, columns), 0)]
 
     while stack:
         extent, intent, start = stack.pop()
+        if guard is not None:
+            guard.tick()
         found.append((extent, intent))
 
         for j in range(start, n_attributes):
@@ -171,7 +264,11 @@ def _closebyone_bitsets(
     return found
 
 
-def enumerate_concepts_closebyone(context: FormalContext) -> list[Concept]:
+def enumerate_concepts_closebyone(
+    context: FormalContext,
+    *,
+    _guard: _SizeGuard | None = None,
+) -> list[Concept]:
     """
     Enumerate formal concepts using Close-by-One.
 
@@ -182,36 +279,89 @@ def enumerate_concepts_closebyone(context: FormalContext) -> list[Concept]:
     that test runs before the rest of the new intent is computed, so most
     duplicates are rejected early. Sets are integer bitsets throughout.
     """
-    found = _closebyone_bitsets(BitsetContext(context))
+    found = _closebyone_bitsets(BitsetContext(context), guard=_guard or _SizeGuard())
 
     concepts = [_to_concept(extent, intent) for extent, intent in found]
 
-    return sorted(
-        concepts,
-        key=lambda c: (
-            len(c.extent),
-            sorted(c.extent),
-            sorted(c.intent),
-        ),
-    )
+    return sorted(concepts, key=_size_order)
+
+
+def _size_order(concept: Concept):
+    """Order used by bruteforce and Close-by-One: by extent size, then content."""
+    return (len(concept.extent), sorted(concept.extent), sorted(concept.intent))
+
+
+def _lectic_order(n_attributes: int):
+    """NextClosure's order: intents compared as bit strings, attribute 0 first."""
+    def key(concept: Concept) -> int:
+        return sum(1 << (n_attributes - 1 - m) for m in concept.intent)
+
+    return key
+
+def _resolve_min_support(min_support: int | float | None, n_objects: int) -> int:
+    """Turn an absolute (int) or relative (float) support into an object count."""
+    if min_support is None:
+        return 0
+
+    from conceptflow.algorithms.implications import _resolve_min_support as resolve
+
+    return resolve(min_support, n_objects)
+
 
 def enumerate_concepts(
     context: FormalContext,
     method: str = "nextclosure",
+    min_support: int | float | None = None,
+    max_concepts: int | None = None,
 ) -> list[Concept]:
     """
     Enumerate concepts using the selected method.
+
+    Parameters
+    ----------
+    context:
+        The formal context.
+
+    method:
+        "nextclosure" (lectic order), "closebyone" or "bruteforce" (both
+        ordered by extent size).
+
+    min_support:
+        Only enumerate concepts whose extent has at least this many objects
+        (an int) or this fraction of all objects (a float): the "iceberg"
+        of the lattice. These concepts form an up-set, so the top concept is
+        always included.
+
+    max_concepts:
+        Stop with :class:`ConceptLimitExceeded` once more than this many
+        concepts were found. By default there is no limit; enumerations past
+        50,000 concepts emit a :class:`LargeLatticeWarning` and continue.
     """
     method = normalize_enumeration_algorithm(method)
+    guard = _SizeGuard(max_concepts)
+    threshold = _resolve_min_support(min_support, context.n_objects)
+
+    if threshold > 0:
+        # Pruned Close-by-One computes exactly the frequent concepts; they are
+        # then put in the order the requested method would have produced.
+        found = _closebyone_bitsets(BitsetContext(context), threshold, guard)
+        concepts = [_to_concept(extent, intent) for extent, intent in found]
+        if method == "nextclosure":
+            return sorted(concepts, key=_lectic_order(context.n_attributes))
+        return sorted(concepts, key=_size_order)
 
     if method == "bruteforce":
-        return enumerate_concepts_bruteforce(context)
+        # Bruteforce has no incremental output; count once it is done.
+        concepts = enumerate_concepts_bruteforce(context)
+        for _ in concepts:
+            guard.tick()
+        return concepts
 
     if method == "nextclosure":
-        return enumerate_concepts_nextclosure(context)
+        return enumerate_concepts_nextclosure(context, _guard=guard)
 
     if method == "closebyone":
-        return enumerate_concepts_closebyone(context)
+        return enumerate_concepts_closebyone(context, _guard=guard)
 
     raise RuntimeError(
         f'Algorithm "{method}" was normalized but has no implementation.'

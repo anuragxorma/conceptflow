@@ -10,6 +10,7 @@ Additive Line Diagrams" (2026), arXiv:2603.16366.
 
 from __future__ import annotations
 
+import os
 import warnings
 from dataclasses import replace
 
@@ -117,7 +118,7 @@ def lattice_to_graph_data_dimflux(
         warnings.warn(
             f"DimFlux layout of {lattice.n_concepts} concepts may take several "
             'minutes. For large lattices, layout="none" is much faster.',
-            stacklevel=2,
+            skip_file_prefixes=(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),),
         )
 
     graph_data = lattice_to_graph_data(

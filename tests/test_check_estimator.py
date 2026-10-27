@@ -28,7 +28,7 @@ from sklearn.utils.estimator_checks import parametrize_with_checks
 from conceptflow.cluster import ConceptLatticeEstimator
 from conceptflow.feature_extraction import ConceptMembershipEncoder
 from conceptflow.preprocessing import ConceptualScaler, NominalScale, ThresholdScale
-from conceptflow.rules import ImplicationBasisEstimator
+from conceptflow.rules import ImplicationBasisEstimator, ImplicationOutlierDetector
 
 _INF_IS_A_VALUE = (
     'NaN is rejected under the default missing="error", but inf is a valid '
@@ -51,7 +51,15 @@ def test_concept_membership_encoder_sklearn_checks(estimator, check):
     check(estimator)
 
 
-@parametrize_with_checks([ConceptLatticeEstimator()])
+@parametrize_with_checks(
+    [
+        ConceptLatticeEstimator(),
+        ConceptLatticeEstimator(min_support=2),
+        ConceptLatticeEstimator(select="stability", n_concepts=5),
+        ConceptLatticeEstimator(select="delta", n_concepts=3, min_support=0.2),
+        ConceptLatticeEstimator(select="support", n_concepts=4, algorithm="closebyone"),
+    ]
+)
 def test_concept_lattice_estimator_sklearn_checks(estimator, check):
     check(estimator)
 
@@ -73,6 +81,17 @@ def test_conceptual_scaler_sklearn_checks(estimator, check):
 
 @parametrize_with_checks([ImplicationBasisEstimator()])
 def test_implication_basis_estimator_sklearn_checks(estimator, check):
+    check(estimator)
+
+
+@parametrize_with_checks(
+    [
+        ImplicationOutlierDetector(),
+        ImplicationOutlierDetector(contamination=0.1),
+        ImplicationOutlierDetector(min_confidence=0.8, min_support=2, include_exact=False),
+    ]
+)
+def test_implication_outlier_detector_sklearn_checks(estimator, check):
     check(estimator)
 
 

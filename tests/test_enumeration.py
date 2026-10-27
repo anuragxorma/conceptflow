@@ -95,9 +95,13 @@ def test_closebyone_pruning_keeps_exactly_the_frequent_concepts(seed):
     ctx = FormalContext.from_array(rng.random((12, 6)) < 0.5)
     everything = enumerate_concepts_bruteforce(ctx)
 
+    top = max(everything, key=lambda c: len(c.extent))
     for threshold in range(0, 14):
         pruned = _closebyone_bitsets(BitsetContext(ctx), min_extent_size=threshold)
+        # The top concept is always kept.
         expected = {
-            (c.extent, c.intent) for c in everything if len(c.extent) >= threshold
+            (c.extent, c.intent)
+            for c in everything
+            if len(c.extent) >= threshold or c == top
         }
         assert {(to_indices(e), to_indices(i)) for e, i in pruned} == expected

@@ -83,3 +83,37 @@ def check_binary_context_input(X) -> FormalContext:
         )
 
     return FormalContext.from_array(array)
+
+
+def input_feature_names(X) -> tuple[str, ...] | None:
+    """Column names of named input (DataFrame or FormalContext), else None."""
+    if isinstance(X, pd.DataFrame):
+        return tuple(map(str, X.columns))
+    if isinstance(X, FormalContext):
+        return X.attributes
+    return None
+
+
+def remember_feature_names(estimator, X) -> None:
+    """At fit time: remember the column names of named input."""
+    estimator._fit_feature_names = input_feature_names(X)
+
+
+def check_feature_names(estimator, X) -> None:
+    """
+    At transform/predict time: named input must have the same columns, in
+    the same order, as the named input seen during fit (as in scikit-learn).
+    """
+    fitted = getattr(estimator, "_fit_feature_names", None)
+    names = input_feature_names(X)
+    if fitted is not None and names is not None and names != fitted:
+        unexpected = [n for n in names if n not in fitted]
+        missing = [n for n in fitted if n not in names]
+        detail = (
+            f" Unseen: {unexpected[:5]}. Missing: {missing[:5]}."
+            if unexpected or missing
+            else " The columns are the same but in a different order."
+        )
+        raise ValueError(
+            "The feature names should match those that were passed during fit." + detail
+        )

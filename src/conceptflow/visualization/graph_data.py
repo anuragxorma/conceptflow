@@ -208,3 +208,21 @@ def lattice_to_graph_data(
             "layout": None,
         },
     )
+
+def needs_rotation(graph_data: GraphData) -> bool:
+    """
+    Whether a drawing should be rotated so its top concept is straight above
+    its bottom concept.
+
+    Layout engines such as DimFlux return arbitrary orientations. Layered
+    layouts are already upright, and lattices without a single bottom
+    concept (iceberg lattices) have no well-defined axis, so they are left
+    as they are.
+    """
+    if graph_data.metadata.get("layout") == "layered" or len(graph_data.nodes) < 2:
+        return False
+
+    extents = [frozenset(node.metadata["extent_indices"]) for node in graph_data.nodes]
+    smallest = min(extents, key=len)
+    largest = max(extents, key=len)
+    return all(smallest <= e for e in extents) and all(e <= largest for e in extents)

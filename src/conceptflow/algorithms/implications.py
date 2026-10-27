@@ -558,3 +558,56 @@ def compute_luxenburger_basis(
             sorted(rule.conclusion),
         ),
     )
+
+
+def compute_proper_premise_basis(context: FormalContext) -> list[Implication]:
+    """
+    Compute the proper-premise basis (canonical direct basis).
+
+    A *proper premise* for an attribute ``m`` is a minimal set ``A`` (not
+    containing ``m``) with ``m`` in ``A''``. The basis consists of the
+    implications ``A -> A•`` with
+
+        A• = A'' \\ (A ∪ ⋃_{a in A} (A \\ {a})''),
+
+    the attributes for which ``A`` is a proper premise (Ganter). Unlike the
+    canonical basis it is *direct*: applying each implication once to any
+    attribute set already gives its closure.
+
+    Every proper premise is a minimal generator (key) -- a proper subset with
+    the same extent would imply ``m`` as well -- so the premises are found
+    among the keys, whose subsets' extents are already known.
+
+    Returns
+    -------
+    list[Implication]
+        Ordered by ``(premise size, premise)``.
+    """
+    from conceptflow.algorithms.enumeration import _intent_of
+    from conceptflow.algorithms.generators import _keys_with_extents
+
+    bits = BitsetContext(context)
+    key_extent = _keys_with_extents(bits)
+    intent_of: dict[int, int] = {}
+
+    def closure_of_key(key: int) -> int:
+        extent = key_extent[key]
+        if extent not in intent_of:
+            intent_of[extent] = _intent_of(extent, bits.columns)
+        return intent_of[extent]
+
+    implications = []
+    for key in key_extent:
+        conclusion = closure_of_key(key) & ~key
+        rest = key
+        while rest and conclusion:
+            low = rest & -rest
+            conclusion &= ~closure_of_key(key ^ low)
+            rest ^= low
+
+        if conclusion:
+            implications.append(
+                Implication(premise=to_indices(key), conclusion=to_indices(conclusion))
+            )
+
+    return sorted(implications, key=lambda imp: (len(imp.premise), sorted(imp.premise)))

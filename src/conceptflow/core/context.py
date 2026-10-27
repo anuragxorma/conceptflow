@@ -18,6 +18,7 @@ modules such as conceptflow.preprocessing or conceptflow.cluster.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Iterable
 
 import numpy as np
@@ -29,14 +30,56 @@ def _is_index(value) -> bool:
     return isinstance(value, (int, np.integer)) and not isinstance(value, (bool, np.bool_))
 
 
+TRUE_STRINGS = frozenset({"1", "1.0", "true", "True", "TRUE", "x", "X", "×"})
+FALSE_STRINGS = frozenset({"0", "0.0", "false", "False", "FALSE", ".", ""})
+
+
+def _cell_is_cross(value) -> bool:
+    """One cell, by one rule independent of the other cells."""
+    if value is None:
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (str, bytes)):
+        text = value.decode() if isinstance(value, bytes) else value
+        text = text.strip()
+        if text in TRUE_STRINGS:
+            return True
+        if text in FALSE_STRINGS:
+            return False
+        if text == "?":
+            raise ValueError(
+                'Incidence contains the unknown marker "?". A FormalContext has '
+                "only crosses and non-crosses; use IncompleteContext for unknown "
+                "entries."
+            )
+        raise ValueError(
+            f"Cannot read {value!r} as a cross or non-cross. Use booleans, "
+            "numbers (> 0 is a cross) or one of "
+            f"{sorted(TRUE_STRINGS)} / {sorted(FALSE_STRINGS - {''})} or empty."
+        )
+    if pd.isna(value):
+        return False
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        raise ValueError(f"Cannot read {value!r} as a cross or non-cross.") from None
+
+
 def _cross_table(data) -> np.ndarray:
     """
-    Convert incidence data to a boolean cross table.
+    Convert incidence data to a boolean cross table, cell by cell:
 
-    Empty cells (None, NaN, ``pd.NA``) mean "no cross", as in a printed cross
-    table. They must not go through ``bool()`` directly: ``bool(NaN)`` is
-    True. The marker ``"?"`` means "unknown", which a formal context cannot
-    express, so it is rejected in favour of IncompleteContext.
+    - booleans are taken as they are;
+    - numbers: values greater than 0 are crosses (0/1 data and counts work
+      as expected; ±1-encoded data reads -1 as absent);
+    - empty cells (None, NaN, ``pd.NA``) mean "no cross", as in a printed
+      cross table (``bool(NaN)`` would be True, so they never go through
+      ``bool()``);
+    - strings must be a known spelling: "1", "true", "x", "×" ... for a
+      cross, "0", "false", ".", "" for none. Anything else (e.g. "yes",
+      "no") raises instead of being guessed; "?" (unknown) points to
+      IncompleteContext.
     """
     raw = np.asarray(data)
 
@@ -45,25 +88,11 @@ def _cross_table(data) -> np.ndarray:
         # context.
         return raw.copy()
 
-    if raw.dtype.kind in "US":
-        has_unknown = bool((raw == ("?" if raw.dtype.kind == "U" else b"?")).any())
-    elif raw.dtype == object:
-        has_unknown = any(isinstance(v, str) and v == "?" for v in raw.flat)
-    else:
-        has_unknown = False
+    if raw.dtype.kind in "iuf":
+        return np.nan_to_num(raw, nan=0.0) > 0
 
-    if has_unknown:
-        raise ValueError(
-            'Incidence contains the unknown marker "?". A FormalContext has '
-            "only crosses and non-crosses; use IncompleteContext for unknown "
-            "entries."
-        )
-
-    empty = pd.isna(raw)
-    if empty.any():
-        raw = np.where(empty, False, raw)
-
-    return raw.astype(bool)
+    cells = [_cell_is_cross(value) for value in raw.ravel().tolist()]
+    return np.array(cells, dtype=bool).reshape(raw.shape)
 
 
 @dataclass(frozen=True)
@@ -105,6 +134,9 @@ class FormalContext:
         incidence = _cross_table(self.incidence)
 
         expected_shape = (len(self.objects), len(self.attributes))
+        if incidence.size == 0 and 0 in expected_shape:
+            # e.g. [] for a context without objects
+            incidence = np.zeros(expected_shape, dtype=bool)
         if incidence.shape != expected_shape:
             raise ValueError(
                 "Incidence matrix has shape "
@@ -189,52 +221,47 @@ class FormalContext:
 
         return read_cxt(path)
 
-    def _resolve_object_indices(self, objects: Iterable[int | str]) -> list[int]:
-        """
-        Resolve object indices or object names to integer indices.
+    @cached_property
+    def _object_index(self) -> dict[str, int]:
+        return {name: index for index, name in enumerate(self.objects)}
 
-        This keeps ConceptFlow internally index-based while allowing older
-        code, such as the DimFlux bridge, to pass object names.
-        """
-        object_to_index = {
-            name: index
-            for index, name in enumerate(self.objects)
-        }
+    @cached_property
+    def _attribute_index(self) -> dict[str, int]:
+        return {name: index for index, name in enumerate(self.attributes)}
 
+    @staticmethod
+    def _resolve(items, index_of: dict[str, int], size: int, kind: str) -> list[int]:
+        """
+        Names -> indices; integers are positions and must be in range.
+
+        Names are always strings (FormalContext converts them), so an integer
+        is never mistaken for a name.
+        """
         resolved: list[int] = []
-
-        for obj in objects:
-            if _is_index(obj):
-                resolved.append(int(obj))
+        for item in items:
+            if _is_index(item):
+                if not 0 <= item < size:
+                    raise IndexError(
+                        f"{kind} index {item} is out of range for {size} {kind}s."
+                    )
+                resolved.append(int(item))
             else:
-                resolved.append(object_to_index[obj])
-
+                try:
+                    resolved.append(index_of[item])
+                except KeyError:
+                    raise KeyError(f"Unknown {kind} {item!r}.") from None
         return resolved
+
+    def _resolve_object_indices(self, objects: Iterable[int | str]) -> list[int]:
+        """Resolve object names or indices to integer indices."""
+        return self._resolve(objects, self._object_index, self.n_objects, "object")
 
     def _resolve_attribute_indices(
         self,
         attributes: Iterable[int | str],
     ) -> list[int]:
-        """
-        Resolve attribute indices or attribute names to integer indices.
-
-        This keeps ConceptFlow internally index-based while allowing older
-        code, such as the DimFlux bridge, to pass attribute names.
-        """
-        attribute_to_index = {
-            name: index
-            for index, name in enumerate(self.attributes)
-        }
-
-        resolved: list[int] = []
-
-        for attr in attributes:
-            if _is_index(attr):
-                resolved.append(int(attr))
-            else:
-                resolved.append(attribute_to_index[attr])
-
-        return resolved
+        """Resolve attribute names or indices to integer indices."""
+        return self._resolve(attributes, self._attribute_index, self.n_attributes, "attribute")
 
     def object_derivation(self, objects: Iterable[int | str]) -> frozenset[int]:
         """
@@ -265,6 +292,106 @@ class FormalContext:
 
         resolved = self._resolve_attribute_indices(attributes)
         return attribute_closure(self, resolved)
+
+    # ------------------------------------------------------------------
+    # Building new contexts (a FormalContext is immutable)
+    # ------------------------------------------------------------------
+
+    def transpose(self) -> "FormalContext":
+        """The dual context: objects and attributes swap roles."""
+        return FormalContext(
+            objects=self.attributes,
+            attributes=self.objects,
+            incidence=self.incidence.T,
+        )
+
+    def subcontext(
+        self,
+        objects: Iterable[int | str] | None = None,
+        attributes: Iterable[int | str] | None = None,
+    ) -> "FormalContext":
+        """
+        Restrict to the given objects and/or attributes, in the given order.
+
+        ``None`` keeps all of them. Names and indices are both accepted.
+        """
+        rows = (
+            list(range(self.n_objects))
+            if objects is None
+            else self._resolve_object_indices(objects)
+        )
+        columns = (
+            list(range(self.n_attributes))
+            if attributes is None
+            else self._resolve_attribute_indices(attributes)
+        )
+        return FormalContext(
+            objects=tuple(self.objects[i] for i in rows),
+            attributes=tuple(self.attributes[j] for j in columns),
+            incidence=self.incidence[
+                np.ix_(np.asarray(rows, dtype=int), np.asarray(columns, dtype=int))
+            ],
+        )
+
+    def remove_objects(self, objects: Iterable[int | str]) -> "FormalContext":
+        """A copy without the given objects."""
+        drop = set(self._resolve_object_indices(objects))
+        return self.subcontext(objects=[i for i in range(self.n_objects) if i not in drop])
+
+    def remove_attributes(self, attributes: Iterable[int | str]) -> "FormalContext":
+        """A copy without the given attributes."""
+        drop = set(self._resolve_attribute_indices(attributes))
+        return self.subcontext(
+            attributes=[j for j in range(self.n_attributes) if j not in drop]
+        )
+
+    def add_objects(self, names: Iterable[str], rows) -> "FormalContext":
+        """
+        A copy with extra objects.
+
+        ``rows`` has one row per new object and one column per attribute.
+        """
+        names = tuple(map(str, names))
+        rows = _cross_table(rows).reshape(len(names), self.n_attributes)
+        return FormalContext(
+            objects=self.objects + names,
+            attributes=self.attributes,
+            incidence=np.vstack([self.incidence, rows]),
+        )
+
+    def add_attributes(self, names: Iterable[str], columns) -> "FormalContext":
+        """
+        A copy with extra attributes.
+
+        ``columns`` has one row per object and one column per new attribute.
+        """
+        names = tuple(map(str, names))
+        columns = _cross_table(columns).reshape(self.n_objects, len(names))
+        return FormalContext(
+            objects=self.objects,
+            attributes=self.attributes + names,
+            incidence=np.hstack([self.incidence, columns]),
+        )
+
+    def rename(self, objects=None, attributes=None) -> "FormalContext":
+        """
+        A copy with renamed objects and/or attributes.
+
+        Each argument is a mapping (old name -> new name; names not in it are
+        kept) or a function applied to every name.
+        """
+        def renamed(names, how):
+            if how is None:
+                return names
+            if callable(how):
+                return tuple(str(how(name)) for name in names)
+            return tuple(str(how.get(name, name)) for name in names)
+
+        return FormalContext(
+            objects=renamed(self.objects, objects),
+            attributes=renamed(self.attributes, attributes),
+            incidence=self.incidence,
+        )
 
     def to_dataframe(self) -> pd.DataFrame:
         """

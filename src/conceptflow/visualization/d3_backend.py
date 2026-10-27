@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from conceptflow.visualization.graph_data import GraphData
+from conceptflow.visualization.graph_data import GraphData, needs_rotation
 from conceptflow.visualization.html_figure import HTMLFigure
 
 
@@ -36,6 +36,7 @@ def graph_data_to_d3_data(graph_data: GraphData) -> dict[str, Any]:
             for edge in graph_data.edges
         ],
         "metadata": graph_data.metadata,
+        "rotate": needs_rotation(graph_data),
     }
 
 
@@ -248,7 +249,7 @@ function showDetails(d) {{
   `);
 }}
 
-function computeTransform(nodes, targetWidth, targetHeight, padding) {{
+function computeTransform(nodes, targetWidth, targetHeight, padding, rotate) {{
   const topNode = nodes.reduce((best, d) =>
     (d.metadata?.extent_size ?? 0) > (best.metadata?.extent_size ?? 0) ? d : best
   , nodes[0]);
@@ -267,7 +268,7 @@ function computeTransform(nodes, targetWidth, targetHeight, padding) {{
 
   const currentAngle = Math.atan2(vy, vx);
   const desiredAngle = -Math.PI / 2;
-  const angle = desiredAngle - currentAngle;
+  const angle = rotate ? desiredAngle - currentAngle : 0;
 
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
@@ -320,7 +321,9 @@ function computeTransform(nodes, targetWidth, targetHeight, padding) {{
 function render() {{
   rootLayer.selectAll("*").remove();
 
-  const transform = computeTransform(graphData.nodes, svgWidth, svgHeight, 80);
+  const transform = computeTransform(
+    graphData.nodes, svgWidth, svgHeight, 80, graphData.rotate !== false
+  );
   const nodeById = new Map(graphData.nodes.map(d => [d.id, d]));
 
   graphData.nodes.forEach(d => {{

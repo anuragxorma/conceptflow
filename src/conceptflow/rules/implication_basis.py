@@ -12,6 +12,7 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.algorithms.implications import Implication, compute_canonical_basis
 from conceptflow.validation import check_binary_context_input
+from conceptflow.validation.input import check_feature_names, remember_feature_names
 
 
 class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
@@ -47,6 +48,7 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
             raise ValueError('output must be "array", "dataframe", or "sparse".')
 
         context = check_binary_context_input(X)
+        remember_feature_names(self, X)
 
         self.context_ = context
         self.n_features_in_ = context.n_attributes
@@ -75,6 +77,7 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
         """
         check_is_fitted(self, "implications_")
 
+        check_feature_names(self, X)
         context = check_binary_context_input(X)
 
         if context.n_attributes != self.n_features_in_:

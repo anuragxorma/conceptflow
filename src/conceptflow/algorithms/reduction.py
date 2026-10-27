@@ -117,3 +117,85 @@ def clarified_context(context: FormalContext) -> FormalContext:
     This is a convenience wrapper around clarify_context.
     """
     return clarify_context(context).context
+
+@dataclass(frozen=True)
+class ReductionResult:
+    """
+    Result of context reduction.
+
+    Parameters
+    ----------
+    context:
+        The reduced context. Its concept lattice is isomorphic to the
+        original one.
+
+    object_groups, attribute_groups:
+        From clarification: kept name -> all original names it stands for.
+
+    removed_objects, removed_attributes:
+        Reducible objects/attributes of the clarified context, which were
+        dropped.
+    """
+
+    context: FormalContext
+    object_groups: dict[str, tuple[str, ...]]
+    attribute_groups: dict[str, tuple[str, ...]]
+    removed_objects: tuple[str, ...]
+    removed_attributes: tuple[str, ...]
+
+
+def _reducible(rows: np.ndarray) -> list[int]:
+    """
+    Indices of reducible rows of a clarified incidence matrix.
+
+    A row ``r`` is reducible iff it equals the intersection of all rows that
+    strictly contain it (the intersection of no rows being the full row).
+    """
+    reducible = []
+    rows = np.asarray(rows, dtype=bool)
+    sizes = rows.sum(axis=1)
+
+    for i, row in enumerate(rows):
+        # Strict supersets: contain the row (no attribute of it missing) and
+        # are larger (the context is clarified, so no other row equals it).
+        superset = ~(rows[:, row] == False).any(axis=1) & (sizes > sizes[i])  # noqa: E712
+        meet = rows[superset].all(axis=0) if superset.any() else np.ones_like(row)
+        if np.array_equal(meet, row):
+            reducible.append(i)
+
+    return reducible
+
+
+def reduce_context(context: FormalContext) -> ReductionResult:
+    """
+    Clarify, then remove reducible objects and attributes.
+
+    An object is reducible if its object concept is the join of other object
+    concepts (its intent is the intersection of strictly larger object
+    intents); an attribute is reducible if its attribute concept is a meet
+    of other attribute concepts. Removing them keeps the concept lattice up
+    to isomorphism, giving the smallest context with that lattice.
+    """
+    clarified = clarify_context(context)
+    ctx = clarified.context
+
+    drop_objects = set(_reducible(ctx.incidence))
+    drop_attributes = set(_reducible(ctx.incidence.T))
+
+    reduced = ctx.subcontext(
+        objects=[i for i in range(ctx.n_objects) if i not in drop_objects],
+        attributes=[j for j in range(ctx.n_attributes) if j not in drop_attributes],
+    )
+
+    return ReductionResult(
+        context=reduced,
+        object_groups=clarified.object_groups,
+        attribute_groups=clarified.attribute_groups,
+        removed_objects=tuple(ctx.objects[i] for i in sorted(drop_objects)),
+        removed_attributes=tuple(ctx.attributes[j] for j in sorted(drop_attributes)),
+    )
+
+
+def reduced_context(context: FormalContext) -> FormalContext:
+    """Return only the reduced context; see :func:`reduce_context`."""
+    return reduce_context(context).context
