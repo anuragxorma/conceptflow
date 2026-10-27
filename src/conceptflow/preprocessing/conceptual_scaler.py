@@ -140,6 +140,19 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
                 f"expecting {self.n_features_in_} features as input."
             )
 
+        # Scales look their columns up by name, e.g. a scaler fitted on a
+        # DataFrame cannot read a plain array (whose columns are x0, x1, ...).
+        missing_columns = [
+            scale.source_attribute
+            for scale in self.scales_
+            if scale.source_attribute not in mvc.attributes
+        ]
+        if missing_columns:
+            raise ValueError(
+                "The feature names should match those that were passed during "
+                f"fit. Missing: {sorted(set(missing_columns))[:5]}."
+            )
+
         binary_df = self._scale_to_dataframe(mvc)
 
         if self.missing == "unknown":

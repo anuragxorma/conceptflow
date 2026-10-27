@@ -36,7 +36,7 @@ from typing import Any
 from conceptflow.exploration.combinations import realized_pairs
 from conceptflow.exploration.view import ExplorationView
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
-from conceptflow.visualization.html_figure import HTMLFigure
+from conceptflow.visualization.html_figure import HTMLFigure, script_json
 
 
 def _mu_local(lattice) -> dict[int, str]:
@@ -423,7 +423,7 @@ def debug_bottom_outer(view: ExplorationView) -> None:
     print(f"   {sorted(bot_filled) if bot_filled else '(empty)'}")
 
     # 5. per-filled-inner breakdown
-    print(f"\n5. Filled inner concepts (detailed):")
+    print("\n5. Filled inner concepts (detailed):")
     for iid in sorted(bot_filled):
         reason = pair_reason.get((bot_outer, iid), "?")
         iext = inner_ext[iid]
@@ -444,8 +444,8 @@ def debug_bottom_outer(view: ExplorationView) -> None:
     #    coordinate pair (⊥_outer, inner_id) corresponds to exactly one
     #    concept in B(K).  Therefore item 8 = item 7.
     print(f"8. Full B(K) concepts projecting to ⊥_outer: {len(bot_filled)}")
-    print(f"   (equals item 7: φ is injective, so each filled coordinate pair")
-    print(f"    (⊥_outer, inner_id) is the image of exactly one concept in B(K))")
+    print("   (equals item 7: φ is injective, so each filled coordinate pair")
+    print("    (⊥_outer, inner_id) is the image of exactly one concept in B(K))")
 
     print(f"\n{sep}")
 
@@ -705,8 +705,8 @@ def render_nested_html(
     - Back / Root: navigate up.
     - Nodes at the outer level show the shared inner template (hollow/filled).
     """
-    data_json = json.dumps(data)
-    display_title = title or data["name"]
+    data_json = script_json(data)
+    display_title = script_json(title or data["name"])
     show_child_previews_json = json.dumps(show_child_previews)
 
     return f"""
@@ -1057,9 +1057,15 @@ function computeTransform(nodes, targetWidth, targetHeight, padding) {{
   }};
 }}
 
+function escapeHtml(text) {{
+  return String(text).replace(/[&<>"']/g, c => ({{
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }})[c]);
+}}
+
 function formatList(values) {{
   if (!values || values.length === 0) return "∅";
-  return values.join(", ");
+  return escapeHtml(values.join(", "));
 }}
 
 function formatAttrLabel(name) {{
@@ -1082,7 +1088,7 @@ function showDefaultDetails() {{
     <div>Click a concept node to inspect its extent and intent.</div>
     <div class="details-section">
       <div class="details-label">Current view</div>
-      <div>${{currentView.name}}</div>
+      <div>${{escapeHtml(currentView.name)}}</div>
     </div>
     <div class="details-section">
       <div class="details-label">Scales</div>
@@ -1126,7 +1132,7 @@ function showDetails(d) {{
 }}
 
 function updateHeader() {{
-  titleEl.text(currentView === rootData ? "{display_title}" : currentView.name);
+  titleEl.text(currentView === rootData ? {display_title} : currentView.name);
   const scales = currentView.scale_names && currentView.scale_names.length
     ? currentView.scale_names.join(", ")
     : "none";

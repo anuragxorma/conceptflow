@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.3.1 (2026-10-27)
+
+Bug fixes from an audit of 0.3.0.
+
+### Fixed
+
+- **Visualization**
+  - Object or attribute names containing `</script>`, and titles containing
+    quotes, no longer break the interactive HTML pages; names are shown as
+    text, not HTML.
+  - Lattices with two concepts were drawn as a single point by the default
+    (DimFlux) layout; `backend="d3"` with `layout="none"` drew every node at
+    the same spot (it now uses the layered layout).
+  - Iceberg lattices drawn with matplotlib or TikZ labelled objects at a
+    concept that is not their object concept.
+  - matplotlib read `$...$` in names as math (and failed on e.g. `$\foo$`).
+  - `.write()` of TikZ and Graphviz figures creates missing folders; TikZ
+    refuses suffixes other than `.tex`/`.pdf` instead of writing LaTeX into
+    e.g. a `.png`; Graphviz errors show Graphviz's message.
+- **Contexts**
+  - `FormalContext` and `IncompleteContext` are now truly immutable: their
+    arrays are read-only (and copied from the input), so a context cannot be
+    changed after creation.
+  - `ManyValuedContext` equality returned a DataFrame and hashing failed.
+  - `add_objects`/`add_attributes` rearranged wrongly shaped input without
+    an error; they now check the shape.
+  - A single string where a list of names is expected (e.g.
+    `attribute_derivation("ab")`, `implication_confidence(ctx, "a", "b")`)
+    is one name, not a set of one-letter names.
+  - Lattices with the same concepts are equal whichever algorithm built them.
+  - `FormalContext.from_array` accepts scipy sparse matrices.
+- **Files**
+  - `read_cxt` accepts trailing blank lines and a UTF-8 byte-order mark;
+    `write_cxt` refuses names with line breaks, which `.cxt` cannot store.
+  - Malformed JSON contexts raise `ValueError` instead of `KeyError`/`TypeError`.
+- **Estimators**
+  - `NominalScale`/`ContranominalScale` rejected known values when a column's
+    type changed between fit and transform (e.g. ints become floats when a
+    NaN appears), which broke `missing="false"`/`"unknown"` in
+    cross-validation.
+  - `ExactOrdinalTwoFactorizer` could run for hours on small inputs (it tried
+    all pairs of linear extensions); it now uses a polynomial algorithm.
+  - Binary estimators accept string arrays (`"x"`/`"."`, `"1"`/`"0"`) like
+    DataFrames do.
+  - `ConceptualScaler` fitted on a DataFrame raises a clear feature-name error
+    for other columns; `ConceptMembershipEncoder.from_lattice` checks feature
+    names; `ImplicationBasisEstimator` feature names are always unique.
+- **Smaller fixes:** `min_support` accepts `Fraction`; clear errors for
+  `algorithm=None` and a non-numeric `min_confidence`; `concept_entropy`
+  returns `0.0` instead of `-0.0`; `IncompleteContext` names unknown
+  objects/attributes in its errors.
+
 ## 0.3.0 (2026-10-27)
 
 ### Added

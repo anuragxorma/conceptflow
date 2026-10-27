@@ -261,10 +261,17 @@ class TikZFigure:
 
     def write(self, path: str | Path) -> Path:
         path = Path(path)
-        if path.suffix.lower() == ".pdf":
-            path.write_bytes(self._compile())
-        else:
+        suffix = path.suffix.lower()
+        if suffix not in {".tex", ".pdf"}:
+            raise ValueError(
+                f"Cannot write TikZ as {suffix or 'a file without suffix'}: use .tex or .pdf."
+            )
+        content = self._compile() if suffix == ".pdf" else None
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if content is None:
             path.write_text(self._standalone, encoding="utf-8")
+        else:
+            path.write_bytes(content)
         return path
 
     def _compile(self) -> bytes:

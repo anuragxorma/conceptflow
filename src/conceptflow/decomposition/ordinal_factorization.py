@@ -25,7 +25,6 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
-from itertools import combinations
 
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -181,73 +180,52 @@ def bipartite_coloring(
     return color
 
 
-def _concept_leq(
-    lattice: ConceptLattice,
-    left_index: int,
-    right_index: int,
-) -> bool:
+def _concept_order(lattice: ConceptLattice) -> np.ndarray:
+    """``leq[i, j]``: concept i lies below (or is) concept j, by extent inclusion."""
+    extents = np.zeros((lattice.n_concepts, lattice.context.n_objects), dtype=int)
+    for i, concept in enumerate(lattice.concepts):
+        extents[i, list(concept.extent)] = 1
+    # i <= j iff no object is in extent i but not in extent j.
+    return extents @ (1 - extents).T == 0
+
+
+def _transitive_orientation(adjacent: list[set[int]]) -> set[tuple[int, int]]:
     """
-    Concept order using extent inclusion.
+    A transitive orientation of an undirected graph (Golumbic's algorithm).
+
+    Repeatedly orients one remaining edge and everything it forces (its
+    implication class: ab forces ac if bc is not an edge, and cb if ac is
+    not an edge), then removes those edges. Raises ValueError if the graph
+    has no transitive orientation.
     """
-    left = lattice.concepts[left_index]
-    right = lattice.concepts[right_index]
-    return left.extent.issubset(right.extent)
+    remaining = [set(neighbours) for neighbours in adjacent]
+    orientation: set[tuple[int, int]] = set()
 
+    for a in range(len(remaining)):
+        while remaining[a]:
+            start = (a, next(iter(remaining[a])))
+            implication_class = {start}
+            stack = [start]
+            while stack:
+                x, y = stack.pop()
+                forced = [(x, z) for z in remaining[x] if z != y and z not in remaining[y]]
+                forced += [(z, y) for z in remaining[y] if z != x and z not in remaining[x]]
+                for edge in forced:
+                    if edge not in implication_class:
+                        implication_class.add(edge)
+                        stack.append(edge)
 
-def _poset_predecessors(
-    lattice: ConceptLattice,
-) -> dict[int, set[int]]:
-    """
-    Return predecessor sets for the concept poset.
-    """
-    n_concepts = lattice.n_concepts
-    predecessors = {i: set() for i in range(n_concepts)}
+            if any((y, x) in implication_class for x, y in implication_class):
+                raise ValueError(
+                    "The complement concept lattice does not have order "
+                    "dimension at most two."
+                )
+            orientation |= implication_class
+            for x, y in implication_class:
+                remaining[x].discard(y)
+                remaining[y].discard(x)
 
-    for i, j in combinations(range(n_concepts), 2):
-        if _concept_leq(lattice, i, j):
-            predecessors[j].add(i)
-        elif _concept_leq(lattice, j, i):
-            predecessors[i].add(j)
-
-    return predecessors
-
-
-def _linear_extensions(
-    predecessors: dict[int, set[int]],
-) -> list[tuple[int, ...]]:
-    """
-    Enumerate all linear extensions of a finite poset.
-
-    This is intentionally simple and suitable only for small contexts.
-    """
-    elements = set(predecessors)
-    result: list[tuple[int, ...]] = []
-
-    def backtrack(
-        current: list[int],
-        remaining: set[int],
-    ) -> None:
-        if not remaining:
-            result.append(tuple(current))
-            return
-
-        available = sorted(
-            element
-            for element in remaining
-            if predecessors[element].issubset(current)
-        )
-
-        for element in available:
-            current.append(element)
-            remaining.remove(element)
-
-            backtrack(current, remaining)
-
-            remaining.add(element)
-            current.pop()
-
-    backtrack([], set(elements))
-    return result
+    return orientation
 
 
 def _realizer_pair(
@@ -256,50 +234,45 @@ def _realizer_pair(
     """
     Find two linear extensions whose intersection is the concept order.
 
-    For small contexts, this brute-force search is a clear way to obtain the
-    two chain orders required by Algorithm 1 when the lattice has order
-    dimension at most two.
+    A poset has order dimension at most two iff its incomparability graph
+    has a transitive orientation T (Dushnik and Miller); the two linear
+    extensions are then P + T and P + T^-1. Polynomial, unlike trying all
+    pairs of linear extensions.
     """
-    predecessors = _poset_predecessors(lattice)
-    extensions = _linear_extensions(predecessors)
-
-    if not extensions:
-        raise ValueError("Could not compute linear extensions.")
-
+    leq = _concept_order(lattice)
     n_concepts = lattice.n_concepts
+    incomparable = ~(leq | leq.T)
+    adjacent = [set(np.flatnonzero(row).tolist()) for row in incomparable]
+    orientation = _transitive_orientation(adjacent)
 
-    poset_relation = {
-        (i, j)
-        for i in range(n_concepts)
-        for j in range(n_concepts)
-        if _concept_leq(lattice, i, j)
-    }
+    chains = []
+    for forward in (True, False):
+        before = leq.copy()
+        for x, y in orientation:
+            if forward:
+                before[x, y] = True
+            else:
+                before[y, x] = True
+        # In a linear order, the number of elements before x is x's position.
+        positions = before.sum(axis=0) - 1
+        if sorted(positions.tolist()) != list(range(n_concepts)):
+            raise ValueError(
+                "The complement concept lattice does not have order "
+                "dimension at most two."
+            )
+        chains.append(tuple(int(i) for i in np.argsort(positions)))
 
-    extension_positions = []
-    for extension in extensions:
-        extension_positions.append(
-            {
-                concept_index: position
-                for position, concept_index in enumerate(extension)
-            }
+    position_1 = np.argsort(chains[0])
+    position_2 = np.argsort(chains[1])
+    both = (position_1[:, None] <= position_1[None, :]) & (
+        position_2[:, None] <= position_2[None, :]
+    )
+    if not np.array_equal(both, leq):
+        raise ValueError(
+            "The complement concept lattice does not have order dimension at most two."
         )
 
-    for ext_1, pos_1 in zip(extensions, extension_positions):
-        for ext_2, pos_2 in zip(extensions, extension_positions):
-            intersection_relation = {
-                (i, j)
-                for i in range(n_concepts)
-                for j in range(n_concepts)
-                if pos_1[i] <= pos_1[j] and pos_2[i] <= pos_2[j]
-            }
-
-            if intersection_relation == poset_relation:
-                return ext_1, ext_2
-
-    raise ValueError(
-        "The complement concept lattice does not appear to have "
-        "order dimension at most two."
-    )
+    return chains[0], chains[1]
 
 
 def _factor_from_chain_order(

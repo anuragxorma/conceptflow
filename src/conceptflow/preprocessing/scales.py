@@ -92,6 +92,25 @@ class Scale(ABC):
         return f"{self.__class__.__name__}(source_attribute={self.source_attribute!r})"
 
 
+def _vocabulary_position(scale: Scale, value: Any, mvc) -> int:
+    """
+    Position of ``value`` in the scale's fitted domain, matched by equality:
+    1, 1.0 and np.int64(1) are the same value (a column's dtype can change
+    between fit and transform, e.g. ints become floats when NaN appears).
+    """
+    domain = scale.domain(mvc)
+    for position, known in enumerate(domain):
+        try:
+            if known == value or str(known) == str(value):
+                return position
+        except (TypeError, ValueError):
+            continue
+    raise ValueError(
+        f'Value {value!r} for attribute "{scale.source_attribute}" was '
+        f"not part of the vocabulary this scale was fit on. Known values: {domain}."
+    )
+
+
 class NominalScale(Scale):
     """
     Nominal scale for unordered categorical values.
@@ -123,15 +142,7 @@ class NominalScale(Scale):
         between fit and transform.
         """
         attrs = self.binary_attributes(mvc)
-        target = f"{self.source_attribute}={value}"
-
-        if target not in attrs:
-            raise ValueError(
-                f'Value {value!r} for attribute "{self.source_attribute}" was '
-                f"not part of the vocabulary this scale was fit on. Known "
-                f"values: {sorted(mvc.unique_values(self.source_attribute), key=str)}."
-            )
-
+        target = attrs[_vocabulary_position(self, value, mvc)]
         return {attr: attr == target for attr in attrs}
 
 
@@ -165,15 +176,7 @@ class ContranominalScale(Scale):
         contract ``mvc`` must satisfy here.
         """
         attrs = self.binary_attributes(mvc)
-        target = f"{self.source_attribute}!={value}"
-
-        if target not in attrs:
-            raise ValueError(
-                f'Value {value!r} for attribute "{self.source_attribute}" was '
-                f"not part of the vocabulary this scale was fit on. Known "
-                f"values: {sorted(mvc.unique_values(self.source_attribute), key=str)}."
-            )
-
+        target = attrs[_vocabulary_position(self, value, mvc)]
         return {attr: attr != target for attr in attrs}
 
 

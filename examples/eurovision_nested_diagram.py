@@ -506,7 +506,7 @@ def main() -> None:
         print(f"  {col}: {n_true}/{len(df)} winners got cluster support")
 
     print("\nMusic distribution:")
-    print(f"  bpm (slow <100 / medium 100–149 / fast >=150):")
+    print("  bpm (slow <100 / medium 100–149 / fast >=150):")
     print(f"    slow={(df['bpm'] < 100).sum()}  medium={((df['bpm'] >= 100) & (df['bpm'] < 150)).sum()}  fast={(df['bpm'] >= 150).sum()}")
     print(f"  key_mode: {df['key_mode'].value_counts().to_dict()}")
 

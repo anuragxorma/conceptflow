@@ -1,10 +1,13 @@
 """
 Burmeister .cxt I/O example.
 
-Run from the project root:
+Run with:
 
     python examples/cxt_io.py
 """
+
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
@@ -22,10 +25,10 @@ def main():
         attributes=["m1", "m2", "m3"],
     )
 
-    path = "examples/example_context.cxt"
-
-    write_cxt(context, path)
-    loaded = read_cxt(path)
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "example_context.cxt"
+        write_cxt(context, path)
+        loaded = read_cxt(path)
 
     print("Original:")
     print(context.to_dataframe())

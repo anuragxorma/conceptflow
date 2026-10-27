@@ -76,6 +76,8 @@ class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
         """
         encoder = cls(output=output)
         encoder._fit_from_lattice(lattice)
+        # Fitted on the lattice's context, as fit(lattice.context) would be.
+        encoder._fit_feature_names = lattice.context.attributes
         return encoder
 
     def fit(self, X, y=None):

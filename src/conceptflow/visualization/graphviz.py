@@ -15,6 +15,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from conceptflow.core import ConceptLattice
+from conceptflow.visualization.graph_data import reduced_labels
 
 _ATTRIBUTE_COLOR = "#1f4e79"
 _OBJECT_COLOR = "#333333"
@@ -36,34 +37,6 @@ def _join(items: list[str], max_items: int | None) -> str:
     if max_items is not None and len(items) > max_items:
         items = [*items[:max_items], f"+{len(items) - max_items}"]
     return ", ".join(items)
-
-
-def reduced_labels(
-    lattice: ConceptLattice,
-) -> tuple[dict, dict]:
-    """
-    Reduced labelling: attribute ``m`` at μ(m), object ``g`` at γ(g).
-
-    Returns two dicts, concept -> attribute names and concept -> object
-    names. On an iceberg lattice, labels whose concept lies below the
-    iceberg are left out.
-    """
-    attributes: dict = {}
-    objects: dict = {}
-
-    for name in lattice.context.attributes:
-        try:
-            attributes.setdefault(lattice.attribute_concept(name), []).append(name)
-        except ValueError:
-            pass
-
-    for name in lattice.context.objects:
-        try:
-            objects.setdefault(lattice.object_concept(name), []).append(name)
-        except ValueError:
-            pass
-
-    return attributes, objects
 
 
 def lattice_to_dot(
@@ -150,19 +123,23 @@ class GraphvizFigure:
             [self._dot_executable(), f"-T{fmt}"],
             input=self.source.encode("utf-8"),
             capture_output=True,
-            check=True,
             timeout=timeout,
         )
+        if result.returncode != 0:
+            message = result.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"Graphviz could not render {fmt!r}: {message}")
         return result.stdout
 
     def write(self, path: str | Path) -> Path:
         """Write DOT text (``.dot``/``.gv``) or a rendered file (other suffixes)."""
         path = Path(path)
         suffix = path.suffix.lower().lstrip(".")
-        if suffix in {"dot", "gv", ""}:
+        content = None if suffix in {"dot", "gv", ""} else self.render(suffix)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if content is None:
             path.write_text(self.source, encoding="utf-8")
         else:
-            path.write_bytes(self.render(suffix))
+            path.write_bytes(content)
         return path
 
     def _repr_svg_(self) -> str | None:

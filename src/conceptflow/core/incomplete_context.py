@@ -122,8 +122,9 @@ class IncompleteContext:
         if len(set(self.attributes)) != len(self.attributes):
             raise ValueError("Attribute names must be unique.")
 
-        certain = np.asarray(self.certain, dtype=bool)
-        unknown = np.asarray(self.unknown, dtype=bool)
+        # Copies, read-only: the context cannot change after creation.
+        certain = np.array(self.certain, dtype=bool)
+        unknown = np.array(self.unknown, dtype=bool)
         expected_shape = (len(self.objects), len(self.attributes))
 
         for name, matrix in (("certain", certain), ("unknown", unknown)):
@@ -135,6 +136,9 @@ class IncompleteContext:
 
         if (certain & unknown).any():
             raise ValueError("An entry cannot be both certain and unknown.")
+
+        certain.flags.writeable = False
+        unknown.flags.writeable = False
 
         object.__setattr__(self, "certain", certain)
         object.__setattr__(self, "unknown", unknown)
@@ -269,6 +273,8 @@ class IncompleteContext:
 
     @staticmethod
     def _resolve(items: Iterable[int | str], names: tuple[str, ...], kind: str) -> list[int]:
+        if isinstance(items, str):
+            items = [items]
         index_of = {name: i for i, name in enumerate(names)}
         resolved = []
         for item in items:
@@ -279,7 +285,10 @@ class IncompleteContext:
                     )
                 resolved.append(int(item))
             else:
-                resolved.append(index_of[item])
+                try:
+                    resolved.append(index_of[item])
+                except KeyError:
+                    raise KeyError(f"Unknown {kind} {item!r}.") from None
         return resolved
 
     def _attribute_indices(self, attributes: Iterable[int | str]) -> list[int]:

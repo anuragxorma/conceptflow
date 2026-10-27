@@ -189,7 +189,7 @@ def _label_entropy(labels: np.ndarray) -> float:
         return 0.0
     _, counts = np.unique(labels, return_counts=True)
     p = counts / counts.sum()
-    return float(-(p * np.log2(p)).sum())
+    return float(-(p * np.log2(p)).sum()) + 0.0  # + 0.0 turns -0.0 into 0.0
 
 
 def _check_labels(lattice: ConceptLattice, y) -> np.ndarray:

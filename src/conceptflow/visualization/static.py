@@ -106,6 +106,13 @@ def _reduced_labels(graph_data: GraphData) -> tuple[dict[str, list[str]], dict[s
     minimal drawn concepts), and the label is left out, as in the Graphviz
     export.
     """
+    if all("object_labels" in node.metadata for node in graph_data.nodes):
+        # Computed from the lattice by lattice_to_graph_data.
+        return (
+            {node.node_id: list(node.metadata["attribute_labels"]) for node in graph_data.nodes},
+            {node.node_id: list(node.metadata["object_labels"]) for node in graph_data.nodes},
+        )
+
     attributes_at: dict[str, list[str]] = {node.node_id: [] for node in graph_data.nodes}
     objects_at: dict[str, list[str]] = {node.node_id: [] for node in graph_data.nodes}
 
@@ -209,6 +216,7 @@ def render_lattice_matplotlib(
                 (x, y), xytext=(0, offset), textcoords="offset points",
                 ha="center", va="bottom", fontsize=font_size,
                 color=_ATTRIBUTE_COLOR, bbox=_LABEL_BOX,
+                parse_math=False,
             )
         if show_object_labels and objects_at[node.node_id]:
             names = sorted(format_object(name) for name in objects_at[node.node_id])
@@ -216,6 +224,7 @@ def render_lattice_matplotlib(
                 _join_labels(names, max_label_items),
                 (x, y), xytext=(0, -offset), textcoords="offset points",
                 ha="center", va="top", fontsize=font_size, color=_OBJECT_COLOR, bbox=_LABEL_BOX,
+                parse_math=False,
             )
 
     span = max(
@@ -226,7 +235,7 @@ def render_lattice_matplotlib(
         _set_limits(ax, list(zip(xs, ys)), pad=0.12 * span if span > 0 else 1.0)
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, parse_math=False)
 
     return fig
 
@@ -355,6 +364,7 @@ def render_nested_matplotlib(
                 _join_labels(node["new_attrs"], max_label_items), (cx, cy + bubble),
                 xytext=(0, 3), textcoords="offset points", ha="center", va="bottom",
                 fontsize=font_size, color=_ATTRIBUTE_COLOR, bbox=_LABEL_BOX, zorder=5,
+                parse_math=False,
             )
 
         if not template:
@@ -363,6 +373,7 @@ def render_nested_matplotlib(
                     _join_labels(node["new_objects"], max_label_items), (cx, cy - bubble),
                     xytext=(0, -3), textcoords="offset points", ha="center", va="top",
                     fontsize=font_size, color=_OBJECT_COLOR, bbox=_LABEL_BOX, zorder=5,
+                    parse_math=False,
                 )
             continue
 
@@ -391,6 +402,7 @@ def render_nested_matplotlib(
                         _join_labels(inode["new_attrs"], max_label_items), (x, y),
                         xytext=(0, 3), textcoords="offset points", ha="center", va="bottom",
                         fontsize=font_size * 0.8, color=_ATTRIBUTE_COLOR, bbox=_LABEL_BOX, zorder=5,
+                        parse_math=False,
                     )
 
         if show_object_labels and node.get("child"):
@@ -401,11 +413,12 @@ def render_nested_matplotlib(
                         _join_labels(cnode["new_objects"], max_label_items), (x, y),
                         xytext=(0, -3), textcoords="offset points", ha="center", va="top",
                         fontsize=font_size * 0.8, color=_OBJECT_COLOR, bbox=_LABEL_BOX, zorder=5,
+                        parse_math=False,
                     )
 
     _set_limits(ax, list(centers.values()), pad=1.6 * bubble)
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, parse_math=False)
 
     return fig

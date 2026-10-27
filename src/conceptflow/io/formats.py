@@ -44,11 +44,16 @@ def context_from_json(text: str) -> FormalContext:
     data = json.loads(text)
 
     if isinstance(data, dict):
-        return FormalContext(
-            objects=data["objects"],
-            attributes=data["attributes"],
-            incidence=data["incidence"],
-        )
+        try:
+            objects, attributes, incidence = (
+                data["objects"], data["attributes"], data["incidence"]
+            )
+        except KeyError as exc:
+            raise ValueError(
+                f"The JSON context has no {exc.args[0]!r} entry: expected the "
+                'FCART/fcapy layout or {"objects", "attributes", "incidence"}.'
+            ) from None
+        return FormalContext(objects=objects, attributes=attributes, incidence=incidence)
 
     try:
         header, body = data
@@ -68,6 +73,10 @@ def context_from_json(text: str) -> FormalContext:
 
     incidence = np.zeros((len(objects), len(attributes)), dtype=bool)
     for i, indices in enumerate(rows):
+        if not isinstance(indices, list):
+            raise ValueError(
+                f"Object {objects[i]!r}: expected a list of attribute indices, got {indices!r}."
+            )
         for m in indices:
             if isinstance(m, bool) or not isinstance(m, int) or not 0 <= m < len(attributes):
                 raise ValueError(

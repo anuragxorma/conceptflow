@@ -23,6 +23,7 @@ from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import scipy.sparse
 
 
 def _is_index(value) -> bool:
@@ -81,6 +82,8 @@ def _cross_table(data) -> np.ndarray:
       "no") raises instead of being guessed; "?" (unknown) points to
       IncompleteContext.
     """
+    if scipy.sparse.issparse(data):
+        data = data.toarray()
     raw = np.asarray(data)
 
     if raw.dtype == bool:
@@ -93,6 +96,22 @@ def _cross_table(data) -> np.ndarray:
 
     cells = [_cell_is_cross(value) for value in raw.ravel().tolist()]
     return np.array(cells, dtype=bool).reshape(raw.shape)
+
+
+def _new_cells(data, shape: tuple[int, int], argument: str, kind: str) -> np.ndarray:
+    """Cross table for add_objects/add_attributes, which must have exactly ``shape``."""
+    cells = _cross_table(data)
+    if cells.size == 0 and 0 in shape:
+        return np.zeros(shape, dtype=bool)
+    if cells.ndim == 1 and cells.size == shape[0] * shape[1] and 1 in shape:
+        # A single new object (or attribute) may be given as a flat list.
+        cells = cells.reshape(shape)
+    if cells.shape != shape:
+        raise ValueError(
+            f"{argument} has shape {cells.shape}, but expected {shape} "
+            f"(one {'row per new object' if kind == 'object' else 'column per new attribute'})."
+        )
+    return cells
 
 
 @dataclass(frozen=True)
@@ -143,6 +162,9 @@ class FormalContext:
                 f"{incidence.shape}, but expected {expected_shape}."
             )
 
+        # Read-only, so the context cannot change after creation (its hash
+        # and cached lookups depend on it).
+        incidence.flags.writeable = False
         object.__setattr__(self, "incidence", incidence)
 
     def __eq__(self, other: object) -> bool:
@@ -191,6 +213,8 @@ class FormalContext:
         """
         Create a formal context from an array-like binary matrix.
         """
+        if scipy.sparse.issparse(data):
+            data = data.toarray()
         array = np.asarray(data)
 
         if array.ndim != 2:
@@ -235,8 +259,11 @@ class FormalContext:
         Names -> indices; integers are positions and must be in range.
 
         Names are always strings (FormalContext converts them), so an integer
-        is never mistaken for a name.
+        is never mistaken for a name. A single string is one name, not a
+        sequence of one-letter names.
         """
+        if isinstance(items, str):
+            items = [items]
         resolved: list[int] = []
         for item in items:
             if _is_index(item):
@@ -352,7 +379,7 @@ class FormalContext:
         ``rows`` has one row per new object and one column per attribute.
         """
         names = tuple(map(str, names))
-        rows = _cross_table(rows).reshape(len(names), self.n_attributes)
+        rows = _new_cells(rows, (len(names), self.n_attributes), "rows", "object")
         return FormalContext(
             objects=self.objects + names,
             attributes=self.attributes,
@@ -366,7 +393,7 @@ class FormalContext:
         ``columns`` has one row per object and one column per new attribute.
         """
         names = tuple(map(str, names))
-        columns = _cross_table(columns).reshape(self.n_objects, len(names))
+        columns = _new_cells(columns, (self.n_objects, len(names)), "columns", "attribute")
         return FormalContext(
             objects=self.objects,
             attributes=self.attributes + names,
@@ -398,7 +425,7 @@ class FormalContext:
         Convert the formal context to a pandas DataFrame.
         """
         return pd.DataFrame(
-            self.incidence,
+            self.incidence.copy(),
             index=self.objects,
             columns=self.attributes,
         )

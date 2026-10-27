@@ -429,7 +429,10 @@ def _resolve_min_support(min_support: int | float, n_objects: int) -> int:
     if not isinstance(min_support, numbers.Integral):
         # str() gives the shortest decimal for NumPy floats too, so
         # np.float32(0.1) counts as 0.1 rather than 0.10000000149.
-        min_support = float(str(min_support))
+        try:
+            min_support = float(str(min_support))
+        except ValueError:  # e.g. Fraction(1, 2), whose str() is "1/2"
+            min_support = float(min_support)
         if not 0.0 <= min_support <= 1.0:
             raise ValueError("A fractional min_support must lie in [0, 1].")
         # Rounding keeps e.g. 0.1 * 30 == 3.0000000000000004 from rounding up to 4.
@@ -486,8 +489,12 @@ def compute_luxenburger_basis(
     from conceptflow.algorithms._bitset import from_indices
     from conceptflow.algorithms.enumeration import _closebyone_bitsets, _intent_of
 
-    if not 0.0 <= min_confidence <= 1.0:
-        raise ValueError("min_confidence must lie in [0, 1].")
+    if (
+        isinstance(min_confidence, bool)
+        or not isinstance(min_confidence, numbers.Real)
+        or not 0.0 <= min_confidence <= 1.0
+    ):
+        raise ValueError("min_confidence must be a number in [0, 1].")
 
     support_threshold = _resolve_min_support(min_support, context.n_objects)
     bits = BitsetContext(context)

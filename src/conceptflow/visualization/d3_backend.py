@@ -4,11 +4,11 @@ D3 backend for ordinary ConceptFlow lattice diagrams.
 
 from __future__ import annotations
 
-import json
+import html
 from typing import Any
 
 from conceptflow.visualization.graph_data import GraphData, needs_rotation
-from conceptflow.visualization.html_figure import HTMLFigure
+from conceptflow.visualization.html_figure import HTMLFigure, script_json
 
 
 def graph_data_to_d3_data(graph_data: GraphData) -> dict[str, Any]:
@@ -49,7 +49,7 @@ def render_graph_data_html(
     """
     Render GraphData as a standalone D3 HTML string.
     """
-    data_json = json.dumps(graph_data_to_d3_data(graph_data))
+    data_json = script_json(graph_data_to_d3_data(graph_data))
 
     return f"""
 <!DOCTYPE html>
@@ -168,7 +168,7 @@ def render_graph_data_html(
 <body>
 <div class="conceptflow-container">
   <div class="conceptflow-header">
-    <div class="conceptflow-title">{title}</div>
+    <div class="conceptflow-title">{html.escape(title)}</div>
     <div id="conceptflow-subtitle" class="conceptflow-subtitle"></div>
   </div>
 
@@ -208,9 +208,15 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 
+function escapeHtml(text) {{
+  return String(text).replace(/[&<>"']/g, c => ({{
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }})[c]);
+}}
+
 function formatList(values) {{
   if (!values || values.length === 0) return "∅";
-  return values.join(", ");
+  return escapeHtml(values.join(", "));
 }}
 
 function labelForNode(d) {{
@@ -229,7 +235,7 @@ function showDetails(d) {{
 
     <div class="details-section">
       <div class="details-label">Label</div>
-      <div>${{labelForNode(d)}}</div>
+      <div>${{escapeHtml(labelForNode(d))}}</div>
     </div>
 
     <div class="details-section">
@@ -397,12 +403,19 @@ def render_with_d3(
 ) -> HTMLFigure:
     """
     Render GraphData with the built-in D3 backend.
+
+    Nodes without coordinates get the layered layout first.
     """
+    if any(node.x is None or node.y is None for node in graph_data.nodes):
+        from conceptflow.visualization.layered_layout import layered_layout
+
+        graph_data = layered_layout(graph_data)
+
     return HTMLFigure(
-      render_graph_data_html(
-          graph_data,
-          width=width,
-          height=height,
-          title=title,
-      )
-  )
+        render_graph_data_html(
+            graph_data,
+            width=width,
+            height=height,
+            title=title,
+        )
+    )

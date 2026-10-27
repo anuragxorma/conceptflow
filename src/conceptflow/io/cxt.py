@@ -24,7 +24,8 @@ def read_cxt(path: str | Path) -> FormalContext:
     """
     path = Path(path)
 
-    with path.open("r", encoding="utf-8") as file:
+    # utf-8-sig also reads files that start with a byte-order mark.
+    with path.open("r", encoding="utf-8-sig") as file:
         lines = [line.rstrip("\n") for line in file]
 
     if not lines or lines[0] != "B":
@@ -46,6 +47,20 @@ def read_cxt(path: str | Path) -> FormalContext:
     # first object's name legitimately IS the empty string.
     expected_without_separator = 4 + n_objects + n_attributes + n_objects
     expected_with_separator = expected_without_separator + 1
+
+    # Blank lines after the cross table are not part of the context. (Rows
+    # of a context without attributes are blank too, so only lines beyond
+    # the expected count are dropped.)
+    while len(lines) > expected_with_separator and not lines[-1].strip():
+        lines.pop()
+    if (
+        len(lines) == expected_with_separator
+        and len(lines) > 4
+        and lines[4] != ""
+        and not lines[-1].strip()
+        and n_attributes > 0
+    ):
+        lines.pop()  # no separator line, one trailing blank line
 
     if len(lines) == expected_with_separator:
         object_start = 5
@@ -108,6 +123,14 @@ def write_cxt(context: FormalContext, path: str | Path) -> None:
     Write a FormalContext to a Burmeister .cxt file.
     """
     path = Path(path)
+
+    for kind, names in (("object", context.objects), ("attribute", context.attributes)):
+        for name in names:
+            if "\n" in name or "\r" in name:
+                raise ValueError(
+                    f"The {kind} name {name!r} contains a line break, which the "
+                    ".cxt format cannot store (one name per line)."
+                )
 
     lines: list[str] = [
         "B",

@@ -12,6 +12,13 @@ from collections.abc import Iterable
 from conceptflow.core import Concept, FormalContext
 
 
+def _attribute_set(attributes) -> frozenset:
+    """A single string is one attribute name, not a set of letters."""
+    if isinstance(attributes, str):
+        return frozenset([attributes])
+    return frozenset(attributes)
+
+
 def concept_support(
     concept: Concept,
     context: FormalContext,
@@ -73,8 +80,8 @@ def implication_confidence(
 
     confidence(X -> Y) = support(X union Y) / support(X)
     """
-    premise = frozenset(premise)
-    conclusion = frozenset(conclusion)
+    premise = _attribute_set(premise)
+    conclusion = _attribute_set(conclusion)
 
     premise_support = attribute_set_support(
         context,
@@ -109,8 +116,8 @@ def implication_exceptions(
 
     Attributes may be given as indices or names; object indices are returned.
     """
-    premise = frozenset(premise)
-    conclusion = frozenset(conclusion)
+    premise = _attribute_set(premise)
+    conclusion = _attribute_set(conclusion)
 
     premise_extent = context.attribute_derivation(premise)
     combined_extent = context.attribute_derivation(premise | conclusion)

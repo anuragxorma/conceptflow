@@ -48,6 +48,21 @@ class ConceptLattice:
     def __post_init__(self) -> None:
         object.__setattr__(self, "concepts", tuple(self.concepts))
 
+    def __eq__(self, other: object) -> bool:
+        # The same concepts make the same lattice, whichever order the
+        # algorithm produced them in.
+        if not isinstance(other, ConceptLattice):
+            return NotImplemented
+        return (
+            self.context == other.context
+            and self.min_support == other.min_support
+            and len(self.concepts) == len(other.concepts)
+            and set(self.concepts) == set(other.concepts)
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.context, frozenset(self.concepts), self.min_support))
+
     @classmethod
     def from_context(
         cls,

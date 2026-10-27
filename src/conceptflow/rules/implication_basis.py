@@ -15,6 +15,19 @@ from conceptflow.validation import check_binary_context_input
 from conceptflow.validation.input import check_feature_names, remember_feature_names
 
 
+def _unique(labels: list[str]) -> tuple[str, ...]:
+    """
+    Make labels unique by numbering repeats. (Two implications get the same
+    label only when attribute names contain ", ".)
+    """
+    seen: dict[str, int] = {}
+    unique = []
+    for label in labels:
+        seen[label] = seen.get(label, 0) + 1
+        unique.append(label if seen[label] == 1 else f"{label} #{seen[label]}")
+    return tuple(unique)
+
+
 class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
     """
     Sklearn-compatible estimator for the Duquenne-Guigues (stem) basis.
@@ -55,8 +68,8 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
         self.feature_names_in_ = context.attributes
         self.object_names_in_ = context.objects
         self.implications_ = compute_canonical_basis(context)
-        self.feature_names_out_ = tuple(
-            self._implication_label(imp) for imp in self.implications_
+        self.feature_names_out_ = _unique(
+            [self._implication_label(imp) for imp in self.implications_]
         )
 
         return self

@@ -4,9 +4,18 @@ Small HTML figure wrapper for custom visualizations.
 
 from __future__ import annotations
 
+import json
 import os
 import webbrowser
 from pathlib import Path
+
+
+def script_json(value) -> str:
+    """
+    JSON for a ``<script>`` block. ``<`` is escaped, so names such as
+    ``"</script>"`` cannot end the block early.
+    """
+    return json.dumps(value).replace("<", "\\u003c")
 
 
 class HTMLFigure:

@@ -108,6 +108,19 @@ class ManyValuedContext:
         object.__setattr__(self, "attributes", attributes)
         object.__setattr__(self, "data", data)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ManyValuedContext):
+            return NotImplemented
+        return (
+            self.objects == other.objects
+            and self.attributes == other.attributes
+            and self.data.equals(other.data)
+        )
+
+    def __hash__(self) -> int:
+        # The values may be unhashable; equal contexts have equal names.
+        return hash((self.objects, self.attributes))
+
     @property
     def n_objects(self) -> int:
         """Number of objects."""

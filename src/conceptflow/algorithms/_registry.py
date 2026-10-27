@@ -46,7 +46,7 @@ def normalize_enumeration_algorithm(name: str) -> str:
     ValueError
         If the algorithm is unknown.
     """
-    normalized = name.lower().strip().replace(" ", "_")
+    normalized = name.lower().strip().replace(" ", "_") if isinstance(name, str) else None
 
     if normalized not in ENUMERATION_ALGORITHM_ALIASES:
         supported = ", ".join(sorted(SUPPORTED_ENUMERATION_ALGORITHMS))

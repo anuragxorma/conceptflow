@@ -121,6 +121,34 @@ def _concept_hover_text(
     )
 
 
+def reduced_labels(
+    lattice: ConceptLattice,
+) -> tuple[dict, dict]:
+    """
+    Reduced labelling: attribute ``m`` at μ(m), object ``g`` at γ(g).
+
+    Returns two dicts, concept -> attribute names and concept -> object
+    names. On an iceberg lattice, labels whose concept lies below the
+    iceberg are left out.
+    """
+    attributes: dict = {}
+    objects: dict = {}
+
+    for name in lattice.context.attributes:
+        try:
+            attributes.setdefault(lattice.attribute_concept(name), []).append(name)
+        except ValueError:
+            pass
+
+    for name in lattice.context.objects:
+        try:
+            objects.setdefault(lattice.object_concept(name), []).append(name)
+        except ValueError:
+            pass
+
+    return attributes, objects
+
+
 def lattice_to_graph_data(
     lattice: ConceptLattice,
     stable_ids: bool = False,
@@ -144,6 +172,7 @@ def lattice_to_graph_data(
     """
     concept_to_id: dict[Concept, str] = {}
     nodes: list[GraphNode] = []
+    attributes_at, objects_at = reduced_labels(lattice)
 
     for index, concept in enumerate(lattice.concepts):
         node_id = concept.stable_id() if stable_ids else f"c{index}"
@@ -171,6 +200,8 @@ def lattice_to_graph_data(
                     "intent_indices": sorted(concept.intent),
                     "extent_size": len(concept.extent),
                     "intent_size": len(concept.intent),
+                    "attribute_labels": attributes_at.get(concept, []),
+                    "object_labels": objects_at.get(concept, []),
                     "concept_signature": concept.signature(),
                     "stable_id": concept.stable_id(),
                     "uses_stable_node_id": stable_ids,

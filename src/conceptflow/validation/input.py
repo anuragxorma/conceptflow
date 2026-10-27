@@ -9,6 +9,7 @@ import pandas as pd
 from scipy import sparse
 
 from conceptflow.core import FormalContext, IncompleteContext
+from conceptflow.core.context import _cross_table
 
 _UNKNOWN_HINT = (
     "Binary-context estimators need complete data. Choose a completion with "
@@ -53,10 +54,24 @@ def check_binary_context_input(X) -> FormalContext:
     if np.iscomplexobj(array):
         raise ValueError("Complex data not supported")
 
+    if array.dtype.kind in "US":
+        array = array.astype(object)
+
     if array.dtype == object:
         # Try to coerce to numeric — raises TypeError with sklearn-compatible
         # message if elements cannot be converted (e.g. dicts, arbitrary objects).
-        array = array.astype(float)
+        try:
+            array = array.astype(float)
+        except ValueError:
+            # Strings such as "x" / ".": read cell by cell, as FormalContext
+            # does (unknown spellings raise a ValueError naming the value).
+            # Empty cells are still rejected, as for numeric input.
+            if pd.isna(array).any():
+                raise ValueError(
+                    "Input contains NaN: missing entries. If empty cells mean "
+                    '"no cross", pass FormalContext.from_array(X) instead.'
+                ) from None
+            array = _cross_table(array)
 
     if array.ndim != 2:
         raise ValueError(
