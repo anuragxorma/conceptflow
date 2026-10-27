@@ -2,6 +2,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green)
+[![Documentation](https://readthedocs.org/projects/conceptflow/badge/?version=latest)](https://conceptflow.readthedocs.io)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
 ConceptFlow is a Python library for **Formal Concept Analysis (FCA)** that
@@ -65,19 +66,23 @@ cf.plot_lattice(lattice, backend="tikz", layout="layered").write("lattice.pdf")
 
 ## Documentation
 
-The documentation lives in [`docs/`](https://github.com/anuragxorma/conceptflow/blob/main/docs/index.md):
+The documentation is at **[conceptflow.readthedocs.io](https://conceptflow.readthedocs.io)**:
 
-- [Getting started](https://github.com/anuragxorma/conceptflow/blob/main/docs/getting-started.md)
-- User guide: [contexts](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/contexts.md),
-  [lattices](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/lattices.md),
-  [implications](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/rules.md),
-  [measures](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/measures.md),
-  [scaling](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/scaling.md),
-  [scikit-learn](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/sklearn.md),
-  [visualization](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/visualization.md),
-  [nested diagrams](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/nested.md),
-  [data quality](https://github.com/anuragxorma/conceptflow/blob/main/docs/guide/quality.md)
-- [Changelog](https://github.com/anuragxorma/conceptflow/blob/main/CHANGELOG.md)
+- [Getting started](https://conceptflow.readthedocs.io/en/latest/getting-started/)
+- User guide: [contexts](https://conceptflow.readthedocs.io/en/latest/guide/contexts/),
+  [lattices](https://conceptflow.readthedocs.io/en/latest/guide/lattices/),
+  [implications](https://conceptflow.readthedocs.io/en/latest/guide/rules/),
+  [measures](https://conceptflow.readthedocs.io/en/latest/guide/measures/),
+  [scaling](https://conceptflow.readthedocs.io/en/latest/guide/scaling/),
+  [scikit-learn](https://conceptflow.readthedocs.io/en/latest/guide/sklearn/),
+  [visualization](https://conceptflow.readthedocs.io/en/latest/guide/visualization/),
+  [nested diagrams](https://conceptflow.readthedocs.io/en/latest/guide/nested/),
+  [data quality](https://conceptflow.readthedocs.io/en/latest/guide/quality/),
+  [ordinal factorization](https://conceptflow.readthedocs.io/en/latest/guide/decomposition/)
+- [API reference](https://conceptflow.readthedocs.io/en/latest/api/core/)
+- [Changelog](https://conceptflow.readthedocs.io/en/latest/changelog/)
+
+The sources are in [`docs/`](https://github.com/anuragxorma/conceptflow/tree/main/docs).
 
 To build the documentation site locally (with the API reference):
 

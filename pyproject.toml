@@ -56,6 +56,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/anuragxorma/conceptflow"
+Documentation = "https://conceptflow.readthedocs.io"
 Repository = "https://github.com/anuragxorma/conceptflow"
 Issues = "https://github.com/anuragxorma/conceptflow/issues"
 
