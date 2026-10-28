@@ -1,38 +1,30 @@
 """
-Basic concept lattice construction.
+Basic concept lattice construction, on Ganter & Wille's "living beings and
+water" context (bundled with ConceptFlow).
 
-Run from the project root:
+Run with:
 
     python examples/basic_lattice.py
 """
 
-import numpy as np
-
 import conceptflow as cf
-from conceptflow.cluster import ConceptLatticeEstimator
+from conceptflow.datasets import load_context
 
 
 def main():
-    context = cf.FormalContext.from_array(
-        np.array([
-            [1, 1, 0],
-            [1, 0, 1],
-            [0, 1, 1],
-        ]),
-        objects=["g1", "g2", "g3"],
-        attributes=["m1", "m2", "m3"],
-    )
-
-    lattice = ConceptLatticeEstimator(algorithm="nextclosure").fit(context).get_lattice()
+    context = load_context("livingbeings_en")
+    lattice = cf.ConceptLattice.from_context(context)
 
     print(context)
     print(lattice)
     print("Number of concepts:", lattice.n_concepts)
     print("Number of Hasse edges:", len(lattice.edges))
 
-    print("\nConcepts:")
+    print("\nConcepts (objects | shared attributes):")
     for concept in lattice.concepts:
-        print(concept.signature(), concept.stable_id())
+        objects = ", ".join(context.objects[g] for g in sorted(concept.extent)) or "-"
+        attributes = ", ".join(context.attributes[m] for m in sorted(concept.intent)) or "-"
+        print(f"  {concept.stable_id()}  {objects}  |  {attributes}")
 
 
 if __name__ == "__main__":

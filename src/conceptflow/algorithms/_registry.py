@@ -8,7 +8,6 @@ string logic across the codebase.
 
 from __future__ import annotations
 
-
 ENUMERATION_ALGORITHM_ALIASES = {
     "bruteforce": "bruteforce",
     "brute_force": "bruteforce",

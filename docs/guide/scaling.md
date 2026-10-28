@@ -33,9 +33,22 @@ print(list(binary.columns))
 ```
 
 `output` is `"array"` (default, for pipelines), `"dataframe"`, `"sparse"` or
-`"context"` (a `FormalContext`). Nominal vocabularies are fixed when fitting:
-transforming a value not seen during `fit` raises instead of silently
-producing an all-false row.
+`"context"` (a `FormalContext`). A scale names its column (`"color"`) or gives
+its position (`NominalScale(0)` is the first column), as in scikit-learn's
+`ColumnTransformer`; with a plain array, binary attributes are then named
+after `x0`, `x1`, ...
+
+Nominal vocabularies are fixed when fitting: by default, transforming a value
+not seen during `fit` raises instead of silently producing an all-false row.
+In cross-validation a rare value can be missing from a training fold; there,
+`handle_unknown="ignore"` (as in scikit-learn's `OneHotEncoder`) gives an
+unseen value none of the `x=v` attributes and all of the `x!=v` attributes:
+
+```python
+train = pd.DataFrame({"color": ["red", "blue"]})
+scaler = ConceptualScaler([NominalScale("color")], handle_unknown="ignore").fit(train)
+print(scaler.transform(pd.DataFrame({"color": ["green"]})).tolist())  # [[False, False]]
+```
 
 ## Scale types
 

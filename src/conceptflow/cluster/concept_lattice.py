@@ -13,7 +13,11 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.core import ConceptLattice as CoreConceptLattice
 from conceptflow.validation import check_binary_context_input
-from conceptflow.validation.input import check_feature_names, remember_feature_names
+from conceptflow.validation.input import (
+    check_feature_names,
+    check_output_param,
+    remember_feature_names,
+)
 
 
 class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
@@ -49,7 +53,7 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
         ``LargeLatticeWarning`` suggests ``min_support`` or this option.
 
     select:
-        Rank concepts by ``"stability"`` (exact; full lattice only),
+        Rank concepts by ``"stability"`` (exact),
         ``"delta"`` (Δ-measure) or ``"support"`` (extent size) and keep the
         ``n_concepts`` best as features. ``None`` keeps all concepts.
 
@@ -91,8 +95,7 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
         """
         Build the concept lattice from input data.
         """
-        if self.output not in {"array", "dataframe", "sparse"}:
-            raise ValueError('output must be "array", "dataframe", or "sparse".')
+        check_output_param(self)
 
         if self.select not in {None, "stability", "delta", "support"}:
             raise ValueError('select must be None, "stability", "delta" or "support".')
@@ -132,11 +135,6 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
         from conceptflow.metrics.measures import concept_stability, delta_measure
 
         if self.select == "stability":
-            if lattice.is_iceberg:
-                raise ValueError(
-                    'select="stability" needs the full lattice; with min_support '
-                    'use select="delta" or select="support".'
-                )
             scores = concept_stability(lattice)
         elif self.select == "delta":
             scores = delta_measure(lattice)
@@ -156,6 +154,7 @@ class ConceptLatticeEstimator(TransformerMixin, BaseEstimator):
         the object belongs to the concept's extent, False otherwise.
         """
         check_is_fitted(self, "concepts_")
+        check_output_param(self)
 
         check_feature_names(self, X)
         context = check_binary_context_input(X)

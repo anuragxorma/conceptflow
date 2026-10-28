@@ -47,8 +47,14 @@ The general architectural idea is consistent with standard FCA practice:
 
 from __future__ import annotations
 
+import numbers
 from abc import ABC, abstractmethod
 from typing import Any
+
+
+class UnknownValueError(ValueError):
+    """A value outside the vocabulary a scale was fitted on."""
+
 
 class Scale(ABC):
     """
@@ -59,9 +65,17 @@ class Scale(ABC):
     """
 
     def __init__(self, source_attribute: str | int) -> None:
-        if isinstance(source_attribute, int):
-            self.source_attribute = f"x{source_attribute}"
+        # An integer is a column position, as in scikit-learn's
+        # ColumnTransformer: ConceptualScaler resolves it to the column's
+        # name at fit time. Until then the name is x<position>, the name
+        # ConceptualScaler gives the columns of a plain array.
+        if isinstance(source_attribute, numbers.Integral) and not isinstance(
+            source_attribute, bool
+        ):
+            self.source_position: int | None = int(source_attribute)
+            self.source_attribute = f"x{int(source_attribute)}"
         else:
+            self.source_position = None
             self.source_attribute = source_attribute
 
     @abstractmethod
@@ -77,6 +91,15 @@ class Scale(ABC):
         Encode one many-valued entry as binary attributes.
         """
         raise NotImplementedError
+
+    def encode_unknown(self, mvc) -> dict[str, bool] | None:
+        """
+        The encoding of a value outside the fitted vocabulary, used by
+        ``ConceptualScaler(handle_unknown="ignore")``; None if the scale has
+        none (its values are given explicitly, so an unknown value is an
+        error).
+        """
+        return None
 
     def domain(self, mvc) -> list[Any] | None:
         """
@@ -105,9 +128,10 @@ def _vocabulary_position(scale: Scale, value: Any, mvc) -> int:
                 return position
         except (TypeError, ValueError):
             continue
-    raise ValueError(
+    raise UnknownValueError(
         f'Value {value!r} for attribute "{scale.source_attribute}" was '
-        f"not part of the vocabulary this scale was fit on. Known values: {domain}."
+        f"not part of the vocabulary this scale was fit on. Known values: {domain}. "
+        'Use ConceptualScaler(handle_unknown="ignore") to allow unseen values.'
     )
 
 
@@ -145,6 +169,10 @@ class NominalScale(Scale):
         target = attrs[_vocabulary_position(self, value, mvc)]
         return {attr: attr == target for attr in attrs}
 
+    def encode_unknown(self, mvc) -> dict[str, bool]:
+        """An unseen value equals none of the known values."""
+        return {attr: False for attr in self.binary_attributes(mvc)}
+
 
 class ContranominalScale(Scale):
     """
@@ -178,6 +206,10 @@ class ContranominalScale(Scale):
         attrs = self.binary_attributes(mvc)
         target = attrs[_vocabulary_position(self, value, mvc)]
         return {attr: attr != target for attr in attrs}
+
+    def encode_unknown(self, mvc) -> dict[str, bool]:
+        """An unseen value differs from every known value."""
+        return {attr: True for attr in self.binary_attributes(mvc)}
 
 
 class DichotomicScale(Scale):

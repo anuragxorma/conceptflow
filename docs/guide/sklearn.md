@@ -12,6 +12,7 @@ transformers and with `set_output`.
 | `ConceptMembershipEncoder` | `conceptflow.feature_extraction` | the same from a fixed lattice (`from_lattice`) |
 | `ImplicationBasisEstimator` | `conceptflow.rules` | binary data → one feature per canonical-basis implication |
 | `ImplicationOutlierDetector` | `conceptflow.rules` | outlier detection with implications |
+| `GreConD`, `ASSO` | `conceptflow.decomposition` | binary data → Boolean factor memberships ([guide](decomposition.md)) |
 
 ## Concept features in a pipeline
 
@@ -43,8 +44,11 @@ print(search.best_params_)
 ```
 
 Each concept feature is true for the objects having all attributes of the
-concept's intent, so it is readable; `get_feature_names_out()` returns
-stable concept ids, and `get_lattice()` the fitted lattice.
+concept's intent, so it is readable. `get_feature_names_out()` returns concept
+ids (`Concept.stable_id()`), which are derived from the intent: the same
+concept gets the same feature name when the rows are reordered or resampled,
+e.g. in different cross-validation folds. `get_lattice()` returns the fitted
+lattice.
 
 `ConceptLatticeEstimator` options:
 

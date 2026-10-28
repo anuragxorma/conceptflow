@@ -46,6 +46,16 @@ ctx = cf.FormalContext.from_dataframe(table)
 print(ctx)  # FormalContext(n_objects=8, n_attributes=9)
 ```
 
+This context also ships with ConceptFlow, together with the other classic
+contexts of the FCA repository, the UCI Mushroom data and random contexts
+(see [Datasets](guide/datasets.md)):
+
+```python
+from conceptflow.datasets import load_context
+
+print(load_context("livingbeings_en"))  # FormalContext(n_objects=8, n_attributes=9)
+```
+
 Contexts can also be read from Burmeister `.cxt`, JSON and CSV files; see
 [Formal contexts](guide/contexts.md).
 

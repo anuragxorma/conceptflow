@@ -12,7 +12,11 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.algorithms.implications import Implication, compute_canonical_basis
 from conceptflow.validation import check_binary_context_input
-from conceptflow.validation.input import check_feature_names, remember_feature_names
+from conceptflow.validation.input import (
+    check_feature_names,
+    check_output_param,
+    remember_feature_names,
+)
 
 
 def _unique(labels: list[str]) -> tuple[str, ...]:
@@ -57,8 +61,7 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
         """
         Compute the canonical basis from input data.
         """
-        if self.output not in {"array", "dataframe", "sparse"}:
-            raise ValueError('output must be "array", "dataframe", or "sparse".')
+        check_output_param(self)
 
         context = check_binary_context_input(X)
         remember_feature_names(self, X)
@@ -89,6 +92,7 @@ class ImplicationBasisEstimator(TransformerMixin, BaseEstimator):
         objects used to fit the basis), False otherwise.
         """
         check_is_fitted(self, "implications_")
+        check_output_param(self)
 
         check_feature_names(self, X)
         context = check_binary_context_input(X)

@@ -1,32 +1,25 @@
 """
-D3 lattice visualization example using the triangles context.
+D3 lattice visualization example using Ganter & Wille's triangles context
+(bundled with ConceptFlow).
 
-Run from project root:
+Run with:
 
-    python -m examples.visualize_lattice
+    python examples/visualize_lattice.py
 
 Output:
 
     triangles_lattice.html
 """
 
-from pathlib import Path
-
 import conceptflow as cf
-from conceptflow.cluster import ConceptLatticeEstimator
+from conceptflow.datasets import load_context
 
 
 def main() -> None:
-    cxt_path = Path("data/triangles.cxt")
+    ctx = load_context("triangles_en")
+    lattice = cf.ConceptLattice.from_context(ctx)
 
-    if not cxt_path.exists():
-        raise FileNotFoundError(f"Context file not found: {cxt_path}")
-
-    ctx = cf.FormalContext.from_cxt(cxt_path)
-
-    lattice = ConceptLatticeEstimator(algorithm="nextclosure").fit(ctx).get_lattice()
-
-    print(f"Loaded context: {cxt_path}")
+    print("Context: triangles_en")
     print(f"Context size: ({ctx.n_objects}, {ctx.n_attributes})")
     print(f"Number of concepts: {lattice.n_concepts}")
 

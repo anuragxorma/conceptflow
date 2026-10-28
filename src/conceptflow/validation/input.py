@@ -44,6 +44,9 @@ def check_binary_context_input(X) -> FormalContext:
                 '"no cross", pass FormalContext.from_dataframe(X) instead. '
                 f"For unknown entries: {_UNKNOWN_HINT}"
             )
+        if X.isin([np.inf, -np.inf]).to_numpy().any():
+            # As for arrays (scikit-learn's convention).
+            raise ValueError("Input contains infinity or a value too large.")
         return FormalContext.from_dataframe(X)
 
     if sparse.issparse(X):
@@ -98,6 +101,13 @@ def check_binary_context_input(X) -> FormalContext:
         )
 
     return FormalContext.from_array(array)
+
+
+def check_output_param(estimator) -> None:
+    """``output`` must be "array", "dataframe" or "sparse" (checked at fit and
+    transform time, since set_params can change it after fit)."""
+    if estimator.output not in {"array", "dataframe", "sparse"}:
+        raise ValueError('output must be "array", "dataframe", or "sparse".')
 
 
 def input_feature_names(X) -> tuple[str, ...] | None:

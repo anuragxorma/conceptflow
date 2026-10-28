@@ -43,10 +43,15 @@ show(basis)
 print(len(basis))  # 3
 ```
 
-It is computed with NextClosure; closures under the implications found so far
-are vectorised with NumPy, so a 357 × 42 context with 1,376 implications
-takes about 0.2 s. `compute_canonical_basis_bruteforce` checks every attribute
-subset against the definition and is kept as a reference implementation.
+It is computed with LinCbO (Janoštík, Konečný and Krajča, 2021): a
+Close-by-One search in which each closure continues from its parent's, so
+only the newly added attribute is processed. The UCI Mushroom context
+(8,124 × 119, 2,323 implications) takes about 17 s.
+`compute_canonical_basis(ctx, algorithm="nextclosure")` uses Ganter's
+NextClosure instead, which gives the same basis and can be slightly faster
+on contexts with very many implications and at most 64 attributes.
+`compute_canonical_basis_bruteforce` checks every attribute subset against the
+definition and is kept as a reference implementation.
 
 ## Proper-premise basis
 

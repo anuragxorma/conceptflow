@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.4.0 (2026-10-28)
+
+### Added
+
+- **Boolean matrix factorization** in `conceptflow.decomposition`: `GreConD`
+  (formal concepts as factors) and `ASSO` (association-based factors), as
+  scikit-learn transformers like `NMF`: `components_`, `transform` (factor
+  memberships), `inverse_transform`, `coverage_` and `reconstruction_error_`.
+- **`Ord2Factor`** is implemented (it used to raise `NotImplementedError`):
+  large ordinal two-factorizations of any context, following Algorithm 2 of
+  Dürrschnabel & Stumme (2023). The crosses to drop are found exactly with a
+  SAT solver (`method="exact"`, MiniSat 2.2 via the new dependency
+  `python-sat`) or heuristically (`"greedy"`, `"annealing"`), following
+  Dürrschnabel, Hanika & Stumme (2022); the graph functions are in
+  `conceptflow.decomposition.bipartite`.
+- **`conceptflow.datasets`**: the 20 contexts of the FCA repository
+  (fcarepository.org, CC0) bundled for offline use (`load_context`,
+  `list_contexts`), `fetch_fca_repository` for the current versions,
+  `load_mushroom` (UCI Mushroom, downloaded once and cached; the standard
+  8124 × 119 context or the raw many-valued data) and `make_random_context`.
+- `ConceptualScaler(handle_unknown="ignore")`: values that `NominalScale` or
+  `ContranominalScale` did not see during `fit` no longer have to raise (as
+  in scikit-learn's `OneHotEncoder`), e.g. in cross-validation.
+- **Benchmarks** against fcapy and concepts (`benchmarks/`, with results in
+  the documentation).
+- Documentation: API stability and deprecation policy, datasets,
+  factorization and benchmark pages; `CITATION.cff` and `CONTRIBUTING.md`;
+  continuous integration (tests on Python 3.12 and 3.14 with the oldest and
+  newest supported scikit-learn, the documentation build and the linter, on
+  every push and weekly).
+- Examples use the bundled contexts and run from any folder; a new example
+  classifies the Mushroom data with concept features.
+
+### Changed
+
+- `compute_canonical_basis` uses **LinCbO** (Janoštík, Konečný and Krajča,
+  2021) by default: the same basis, much faster on contexts with many
+  attributes (UCI Mushroom: 134 s → 17 s; random contexts with 70–100
+  attributes: 40–85× faster). `algorithm="nextclosure"` selects the previous
+  algorithm. `ImplicationBasisEstimator` and `ImplicationOutlierDetector`
+  benefit automatically.
+- **Faster concept enumeration**: Close-by-One uses FCbO's pruning, and
+  bitsets are converted with NumPy (Mushroom: concepts 26 s → 13 s, lattice
+  with cover relation 42 s → 29 s).
+- **Exact stability** is computed per concept by inclusion–exclusion over
+  its lower neighbours instead of over the whole lattice: the same values,
+  no longer quadratic (all 238,710 Mushroom concepts in about 40 s), and it
+  now also works on iceberg lattices, including
+  `ConceptLatticeEstimator(select="stability", min_support=...)`.
+- **`ConceptualScaler` is much faster**: values are encoded column by column,
+  each distinct value once (Mushroom: 49 s → 0.1 s), with the same output.
+- **Concept ids** (`Concept.stable_id()`, the feature names of
+  `ConceptLatticeEstimator` and `ConceptMembershipEncoder`, and node ids in
+  drawings with `stable_ids=True`) are derived from the intent only, so the
+  same concept keeps its id when rows are reordered or resampled (e.g.
+  across cross-validation folds), as the documentation promised. Feature
+  names differ from earlier versions.
+- An integer scale source (`NominalScale(0)`) is a column position, as in
+  scikit-learn's `ColumnTransformer`; it used to fail for DataFrames.
+- Binary estimators reject `inf` in DataFrames, as they do in arrays.
+- `ConceptLatticeEstimator`, `ConceptMembershipEncoder` and
+  `ImplicationBasisEstimator` check `output` again at `transform`, after
+  `set_params`.
+- `ExactOrdinalTwoFactorizer` and `Ord2Factor` set `n_features_in_` and
+  `feature_names_in_` and declare sparse input; `Ord2Factor` passes
+  scikit-learn's estimator checks.
+- The deprecated alias `conceptflow.cluster.ConceptLattice` now says that it
+  will be removed in 1.0.
+- Python 3.14 is supported.
+
 ## 0.3.1 (2026-10-27)
 
 Bug fixes from an audit of 0.3.0.

@@ -67,11 +67,7 @@ def test_implication_confidence_exact_implication():
 
 
 def test_implication_confidence_rejects_zero_premise_support():
-    ctx = make_context()
-
-    # No object has all of a, b, and c absent? Actually here a,b,c together
-    # occurs for g2, so use a deliberately impossible valid combination
-    # by creating a small context below.
+    # No object has both a and b, so {a, b} has zero support.
     empty_ctx = FormalContext.from_array(
         np.array([
             [1, 0],

@@ -6,9 +6,10 @@ object below.
 
 ```python
 import conceptflow as cf
-from conceptflow.io import read_cxt
+from conceptflow.datasets import load_context
 
-lattice = cf.ConceptLattice.from_context(read_cxt("data/living_beings_and_water.cxt"))
+# Ganter & Wille's "living beings and water", bundled with ConceptFlow.
+lattice = cf.ConceptLattice.from_context(load_context("livingbeings_en"))
 ```
 
 ## Backends

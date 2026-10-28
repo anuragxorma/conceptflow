@@ -24,12 +24,15 @@ The canonical basis is then exactly:
 
     { P -> (P'' \\ P) : P is a pseudo-intent }
 
-Two implementations are provided:
+Implementations:
 
-- ``compute_canonical_basis`` uses Ganter's NextClosure algorithm on integer
-  bitsets. It visits only the closed sets of the closure operator
-  ``A |-> A^{L*}`` (concept intents plus pseudo-intents), so its cost grows
-  with the size of the lattice and the basis, not with ``2^|M|``.
+- ``compute_canonical_basis`` uses LinCbO (Janoštík, Konečný and Krajča,
+  "LinCbO: fast algorithm for computation of the Duquenne-Guigues basis",
+  Information Sciences 572, 2021) by default, or Ganter's NextClosure with
+  ``algorithm="nextclosure"``. Both work on integer bitsets and visit only
+  the closed sets of the closure operator ``A |-> A^{L*}`` (concept intents
+  plus pseudo-intents), so their cost grows with the size of the lattice and
+  the basis, not with ``2^|M|``.
 - ``compute_canonical_basis_bruteforce`` tries every subset of attributes and
   checks the definition above directly. It is exponential in ``|M|`` and is
   kept as a readable correctness baseline, in the same spirit as
@@ -50,7 +53,7 @@ from itertools import chain, combinations
 
 import numpy as np
 
-from conceptflow.algorithms._bitset import BitsetContext, to_indices
+from conceptflow.algorithms._bitset import BitsetContext, iter_bits, to_indices
 from conceptflow.algorithms.derivation import attribute_closure
 from conceptflow.core.concept import Concept
 from conceptflow.core.context import FormalContext
@@ -283,34 +286,204 @@ class _ImplicationStore:
         return None if (current & blocked).any() else self._from_bools(current)
 
 
-def compute_canonical_basis(context: FormalContext) -> list[Implication]:
+CANONICAL_BASIS_ALGORITHMS = ("lincbo", "nextclosure")
+
+
+def compute_canonical_basis(
+    context: FormalContext, algorithm: str = "lincbo"
+) -> list[Implication]:
     """
     Compute the Duquenne-Guigues (stem) basis of a formal context.
 
-    Uses Ganter's NextClosure algorithm on the closure operator ``A^{L*}``,
-    where ``L`` is the part of the basis found so far. Its closed sets are
-    exactly the concept intents and the pseudo-intents, enumerated in lectic
-    order; every closed set that is not a concept intent is a pseudo-intent
-    and contributes the implication ``P -> P'' \\ P``.
-
-    Step by step
-    ------------
-    1. Start with ``A = {}`` (closed under the empty basis).
-    2. If ``A'' != A``, ``A`` is a pseudo-intent: record ``A -> A''``.
-    3. Find the lectically next ``L*``-closed set: for attributes ``i`` from
-       the last to the first, try ``B = ((A ∩ {0..i-1}) ∪ {i})^{L*}`` and
-       accept the first ``B`` that adds no attribute smaller than ``i``.
-    4. Stop once ``A`` is the full attribute set.
+    Both algorithms enumerate the closed sets of ``A^{L*}``, where ``L`` is
+    the part of the basis found so far, in lectic order. These closed sets
+    are exactly the concept intents and the pseudo-intents; every one that
+    is not a concept intent is a pseudo-intent and contributes the
+    implication ``P -> P'' \\ P``.
 
     Parameters
     ----------
     context:
         The formal context to compute the basis for.
 
+    algorithm:
+        ``"lincbo"`` (default): LinCbO, a Close-by-One search in which each
+        closure continues from its parent's (LinClosure counters), so it
+        only processes the newly added attribute. Much faster on contexts
+        with many attributes. ``"nextclosure"``: Ganter's NextClosure, which
+        closes every candidate from scratch. Both give the same basis.
+
     Returns
     -------
     list[Implication]
         The canonical basis, ordered by ``(premise size, premise)``.
+    """
+    if algorithm == "lincbo":
+        basis = _lincbo(context)
+    elif algorithm == "nextclosure":
+        basis = _nextclosure_basis(context)
+    else:
+        raise ValueError(
+            f"Unknown canonical basis algorithm {algorithm!r}. "
+            f"Use one of {CANONICAL_BASIS_ALGORITHMS}."
+        )
+
+    implications = [
+        Implication(premise=to_indices(premise), conclusion=to_indices(closure & ~premise))
+        for premise, closure in basis
+    ]
+
+    return sorted(
+        implications,
+        key=lambda imp: (len(imp.premise), sorted(imp.premise)),
+    )
+
+
+def _lincbo(context: FormalContext) -> list[tuple[int, int]]:
+    """
+    LinCbO: (pseudo-intent, closure) bitset pairs in lectic order.
+
+    A depth-first Close-by-One search that tries children with the largest
+    attribute first, which visits the ``L*``-closed sets in lectic order (so
+    every pseudo-intent below a set is known before the set is closed).
+
+    - A child ``(B ∪ {i})^{L*}`` is computed by LinClosure *continuing from
+      B's counters*: ``counts[k]`` is the number of premise attributes of
+      implication ``k`` still missing from B, so only implications whose
+      premise contains a newly added attribute are touched.
+    - The child is canonical iff its closure adds no attribute smaller than
+      ``i`` (checked as attributes are added, to stop early).
+    - A pseudo-intent ``P`` adds ``P -> P''``; the search then continues
+      from the intent ``P''`` (if canonical) instead of from ``P``.
+    """
+    bits = BitsetContext(context)
+    n = bits.n_attributes
+    columns = bits.columns
+    rows = bits.rows
+    all_attributes = bits.all_attributes
+
+    basis: list[tuple[int, int]] = []
+    by_attribute: list[list[int]] = [[] for _ in range(n)]
+    by_attribute_array: list[np.ndarray | None] = [None] * n
+
+    def implications_with(a: int) -> np.ndarray:
+        array = by_attribute_array[a]
+        if array is None or len(array) != len(by_attribute[a]):
+            array = np.array(by_attribute[a], dtype=np.intp)
+            by_attribute_array[a] = array
+        return array
+
+    def intent_of(extent: int, known: int) -> int:
+        # Intersect the rows of the extent's objects when there are few of
+        # them; otherwise test each remaining attribute's column.
+        rest = all_attributes & ~known
+        if extent.bit_count() < 2 * rest.bit_count():
+            result = all_attributes
+            for g in iter_bits(extent):
+                result &= rows[g]
+            return result | known
+        result = known
+        for m in iter_bits(rest):
+            if not extent & ~columns[m]:
+                result |= 1 << m
+        return result
+
+    def close(base, base_extent, base_counts, new, below):
+        """
+        ``(base ∪ new)^{L*}`` with its extent and counters, continuing from
+        base's counters; None as soon as an attribute in ``below`` appears.
+        """
+        counts = base_counts.copy()
+        current = base | new
+        extent = base_extent
+        todo = new & ~base
+        while todo:
+            fired: list[int] = []
+            for a in iter_bits(todo):
+                extent &= columns[a]
+                indices = implications_with(a)
+                if len(indices):
+                    counts[indices] -= 1
+                    hit = indices[counts[indices] == 0]
+                    if len(hit):
+                        fired.extend(hit.tolist())
+            added = 0
+            for k in fired:
+                added |= basis[k][1]
+            added &= ~current
+            if added & below:
+                return None
+            current |= added
+            todo = added
+        return current, extent, counts
+
+    def with_new_implications(counts: np.ndarray, current: int) -> np.ndarray:
+        """Counters extended by the implications found since they were made."""
+        k = len(counts)
+        if k == len(basis):
+            return counts
+        extra = np.fromiter(
+            ((basis[j][0] & ~current).bit_count() for j in range(k, len(basis))),
+            dtype=np.int32,
+            count=len(basis) - k,
+        )
+        return np.concatenate([counts, extra])
+
+    def add_implication(premise: int, closure: int) -> None:
+        for a in iter_bits(premise):
+            by_attribute[a].append(len(basis))
+        basis.append((premise, closure))
+
+    root = intent_of(bits.all_objects, 0)
+    start = (0, bits.all_objects, np.zeros(0, dtype=np.int32))
+    if root:
+        add_implication(0, root)
+        start = close(0, bits.all_objects, with_new_implications(start[2], 0), root, 0)
+
+    # Frames: [set, extent, counters, generating attribute, next attribute to try].
+    stack = [[start[0], start[1], start[2], -1, n - 1]]
+    while stack:
+        frame = stack[-1]
+        current, extent, counts, y, i = frame
+        while i > y and current >> i & 1:
+            i -= 1
+        if i <= y:
+            stack.pop()
+            continue
+        frame[4] = i - 1
+        counts = frame[2] = with_new_implications(counts, current)
+
+        bit = 1 << i
+        below = (bit - 1) & ~current
+        found = close(current, extent, counts, bit, below)
+        if found is None:
+            continue
+        candidate, candidate_extent, candidate_counts = found
+        intent = intent_of(candidate_extent, candidate)
+        if intent == candidate:
+            stack.append([candidate, candidate_extent, candidate_counts, i, n - 1])
+            continue
+
+        add_implication(candidate, intent)
+        if intent & below:
+            continue  # the intent is reached from another branch
+        candidate_counts = with_new_implications(candidate_counts, candidate)
+        jumped = close(candidate, candidate_extent, candidate_counts, intent & ~candidate, below)
+        stack.append([jumped[0], jumped[1], jumped[2], i, n - 1])
+
+    return basis
+
+
+def _nextclosure_basis(context: FormalContext) -> list[tuple[int, int]]:
+    """
+    NextClosure: (pseudo-intent, closure) bitset pairs in lectic order.
+
+    1. Start with ``A = {}`` (closed under the empty basis).
+    2. If ``A'' != A``, ``A`` is a pseudo-intent: record ``A -> A''``.
+    3. Find the lectically next ``L*``-closed set: for attributes ``i`` from
+       the last to the first, try ``B = ((A ∩ {0..i-1}) ∪ {i})^{L*}`` and
+       accept the first ``B`` that adds no attribute smaller than ``i``.
+    4. Stop once ``A`` is the full attribute set.
     """
     bits = BitsetContext(context)
     basis: list[tuple[int, int]] = []
@@ -344,15 +517,7 @@ def compute_canonical_basis(context: FormalContext) -> list[Implication]:
 
         current = following
 
-    implications = [
-        Implication(premise=to_indices(premise), conclusion=to_indices(closure & ~premise))
-        for premise, closure in basis
-    ]
-
-    return sorted(
-        implications,
-        key=lambda imp: (len(imp.premise), sorted(imp.premise)),
-    )
+    return basis
 
 
 @dataclass(frozen=True)

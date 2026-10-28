@@ -118,12 +118,13 @@ def test_implication_is_frozen_and_deduplicates_input():
 
 
 # ---------------------------------------------------------------------------
-# Fast (NextClosure) basis vs. the definition-based baseline
+# Fast (LinCbO, NextClosure) bases vs. the definition-based baseline
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("algorithm", ["lincbo", "nextclosure"])
 @pytest.mark.parametrize("seed", range(40))
-def test_fast_basis_matches_bruteforce_on_random_contexts(seed):
+def test_fast_basis_matches_bruteforce_on_random_contexts(seed, algorithm):
     from conceptflow.algorithms import compute_canonical_basis_bruteforce
 
     rng = np.random.default_rng(seed)
@@ -132,7 +133,28 @@ def test_fast_basis_matches_bruteforce_on_random_contexts(seed):
     data = rng.random((n_objects, n_attributes)) < rng.uniform(0.1, 0.9)
     ctx = FormalContext.from_array(data)
 
-    assert compute_canonical_basis(ctx) == compute_canonical_basis_bruteforce(ctx)
+    assert compute_canonical_basis(ctx, algorithm=algorithm) == (
+        compute_canonical_basis_bruteforce(ctx)
+    )
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_lincbo_matches_nextclosure_on_wide_contexts(seed):
+    rng = np.random.default_rng(500 + seed)
+    ctx = FormalContext.from_array(rng.random((int(rng.integers(5, 30)), 75)) < 0.12)
+
+    assert compute_canonical_basis(ctx) == compute_canonical_basis(ctx, algorithm="nextclosure")
+
+
+def test_lincbo_with_empty_premise_and_duplicate_columns():
+    ctx = FormalContext.from_array([[1, 1, 1, 0], [1, 1, 0, 1], [1, 1, 0, 0]])
+
+    assert compute_canonical_basis(ctx) == compute_canonical_basis(ctx, algorithm="nextclosure")
+
+
+def test_unknown_basis_algorithm():
+    with pytest.raises(ValueError, match="Unknown canonical basis algorithm"):
+        compute_canonical_basis(FormalContext.from_array([[1]]), algorithm="linclosure")
 
 
 def test_basis_of_empty_premise():
@@ -274,7 +296,9 @@ def test_matrix_closure_path_matches_bruteforce(seed, monkeypatch):
     data = rng.random((int(rng.integers(1, 12)), int(rng.integers(1, 9)))) < rng.uniform(0.1, 0.9)
     ctx = FormalContext.from_array(data)
 
-    assert compute_canonical_basis(ctx) == compute_canonical_basis_bruteforce(ctx)
+    assert compute_canonical_basis(ctx, algorithm="nextclosure") == (
+        compute_canonical_basis_bruteforce(ctx)
+    )
 
 
 def test_basis_of_context_wider_than_64_attributes():

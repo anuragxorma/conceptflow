@@ -94,7 +94,7 @@ def test_concept_lattice_estimator_supports_closebyone():
 def test_concept_lattice_deprecated_alias_emits_warning():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        model = ConceptLattice(algorithm="nextclosure")
+        ConceptLattice(algorithm="nextclosure")
 
     assert any(issubclass(w.category, DeprecationWarning) for w in caught)
     assert "ConceptLatticeEstimator" in str(caught[0].message)

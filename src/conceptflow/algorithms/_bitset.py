@@ -23,6 +23,14 @@ from conceptflow.core.context import FormalContext
 
 def from_indices(indices: Iterable[int]) -> int:
     """Encode an iterable of indices as a bitset."""
+    if isinstance(indices, (frozenset, set)) and len(indices) > 32:
+        # Large sets: build the bytes with NumPy instead of one shift per index.
+        positions = np.fromiter(indices, dtype=np.int64, count=len(indices))
+        if positions.min() < 0:
+            raise ValueError("Bitset indices must be non-negative.")
+        bools = np.zeros(int(positions.max()) + 1, dtype=bool)
+        bools[positions] = True
+        return int.from_bytes(np.packbits(bools, bitorder="little").tobytes(), "little")
     mask = 0
     for index in indices:
         # operator.index: a numpy integer here would turn the mask into a
@@ -33,6 +41,11 @@ def from_indices(indices: Iterable[int]) -> int:
 
 def to_indices(mask: int) -> frozenset[int]:
     """Decode a bitset into a frozenset of indices."""
+    if mask.bit_count() > 32:
+        # Large sets (e.g. extents of thousands of objects): unpack the bytes
+        # with NumPy instead of looping over the bits in Python.
+        raw = np.frombuffer(mask.to_bytes((mask.bit_length() + 7) // 8, "little"), np.uint8)
+        return frozenset(np.flatnonzero(np.unpackbits(raw, bitorder="little")).tolist())
     indices = []
     while mask:
         low = mask & -mask

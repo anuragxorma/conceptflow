@@ -68,7 +68,7 @@ def compute_minimal_generators(
     generators: dict[Concept, list[frozenset[int]]] = {}
 
     for key, extent in _keys_with_extents(bits).items():
-        concept = Concept(extent=to_indices(extent), intent=to_indices(bits.intent(extent)))
+        concept = Concept._from_indices(to_indices(extent), to_indices(bits.intent(extent)))
         generators.setdefault(concept, []).append(to_indices(key))
 
     return {

@@ -74,9 +74,10 @@ def test_delta_and_bounds_work_on_iceberg_lattices(seed):
         assert value == full_delta[concept]
 
     stability_bounds(iceberg)
-    if iceberg.is_iceberg:
-        with pytest.raises(ValueError, match="full lattice"):
-            concept_stability(iceberg)
+    # Exact stability only needs the context, so it works on icebergs too.
+    full_stability = dict(zip(full.concepts, concept_stability(full)))
+    for concept, value in zip(iceberg.concepts, concept_stability(iceberg)):
+        assert value == full_stability[concept]
 
 
 @pytest.mark.parametrize("seed", range(20))
@@ -155,8 +156,8 @@ def test_estimator_selection_validation():
     assert ConceptLatticeEstimator(n_concepts=3).fit(X).transform(X).shape[1] > 3
     with pytest.raises(ValueError, match="select"):
         ConceptLatticeEstimator(select="nope", n_concepts=3).fit(X)
-    with pytest.raises(ValueError, match="full lattice"):
-        ConceptLatticeEstimator(select="stability", n_concepts=3, min_support=2).fit(X)
+    iceberg = ConceptLatticeEstimator(select="stability", n_concepts=3, min_support=2).fit(X)
+    assert len(iceberg.concepts_) == 3
 
 
 def test_estimator_iceberg_features():

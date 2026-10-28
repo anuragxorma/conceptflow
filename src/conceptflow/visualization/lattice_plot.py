@@ -58,7 +58,8 @@ def plot_lattice(
           fall back to the layered layout.
 
     stable_ids:
-        Whether to use stable concept ids instead of local node ids.
+        Whether to use ``Concept.stable_id()`` (derived from the intent)
+        instead of local node ids c0, c1, ...
 
     width, height:
         Figure size in pixels. For the matplotlib backend they set

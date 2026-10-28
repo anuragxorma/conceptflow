@@ -131,7 +131,10 @@ assert read_cxt("context.cxt") == ctx
 assert read_json("context.json") == ctx
 assert read_csv("context.csv") == ctx
 
-triangles = read_cxt("data/triangles.cxt")
+# The classic contexts of the FCA repository ship with ConceptFlow:
+from conceptflow.datasets import load_context
+
+triangles = load_context("triangles_en")
 ```
 
 `read_csv` accepts `true_values=` / `false_values=` (defaults include

@@ -1,20 +1,17 @@
-import warnings
-
+from conceptflow._deprecation import warn_deprecated
 from conceptflow.cluster.concept_lattice import ConceptLatticeEstimator
 
 
 class ConceptLattice(ConceptLatticeEstimator):
     """
-    Deprecated. Use ``ConceptLatticeEstimator`` instead.
+    Deprecated. Use ``ConceptLatticeEstimator`` instead; removed in 1.0.
     """
 
     def __init__(self, **kwargs):
-        warnings.warn(
-            "conceptflow.cluster.ConceptLattice has been renamed to "
-            "ConceptLatticeEstimator. "
-            "The old name will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
+        warn_deprecated(
+            "conceptflow.cluster.ConceptLattice",
+            "conceptflow.cluster.ConceptLatticeEstimator",
+            removal="1.0",
         )
         super().__init__(**kwargs)
 

@@ -1,0 +1,204 @@
+{
+ "animals_en": {
+  "title": "Animals",
+  "objects": 35,
+  "attributes": 11,
+  "language": "English",
+  "description": "animals and their characteristics",
+  "source": [
+   "Ganter, B., Wille, R., & Stumme, G. (2005). Formal Concept Analysis: Foundations and Applications (Vol. 3626). Springer, p. 27"
+  ]
+ },
+ "binary_relations_en": {
+  "title": "Properties of binary relations",
+  "objects": 14,
+  "attributes": 9,
+  "language": "English",
+  "description": "Properties of binary relations",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 2.15"
+  ]
+ },
+ "bodiesofwater_de": {
+  "title": "Gewässer",
+  "objects": 8,
+  "attributes": 6,
+  "language": "German",
+  "description": "bodies of water and their properties",
+  "source": [
+   "Wille, R. (1984). Liniendiagramme hierarchischer Begriffssysteme. Studien zur Klassifikation. Indeks Verlag, Figure 4",
+   "Wille, R., & Kipke, U. (1987). Formale Begriffsanalyse erläutert an einem Wortfeld. LDV-Forum, 5, Figure 1",
+   "F. Hundsnurscher: Neuere Methoden der Semantik. Max Niemeyer Verlag, Tübingen 1970"
+  ]
+ },
+ "bodiesofwater_en": {
+  "title": "Bodies of water",
+  "objects": 17,
+  "attributes": 5,
+  "language": "English",
+  "description": "bodies of water and their properties",
+  "source": [
+   "unknown"
+  ]
+ },
+ "driveconcepts_de": {
+  "title": "Drive Concepts",
+  "objects": 5,
+  "attributes": 25,
+  "language": "German",
+  "description": "drive concepts for motorcars",
+  "source": [
+   "Ganter, B., & Wille, R. (1996). Formale Begriffsanalyse. Springer. p. 39"
+  ]
+ },
+ "driveconcepts_en": {
+  "title": "Drive concepts",
+  "objects": 5,
+  "attributes": 25,
+  "language": "English",
+  "description": "drive concepts for motorcars",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 1.23"
+  ]
+ },
+ "famous_animals_en": {
+  "title": "Famous Animals",
+  "objects": 5,
+  "attributes": 6,
+  "language": "English",
+  "description": "famous animals and their characteristics",
+  "source": [
+   "Priss, U. (2006), Formal concept analysis in information science. Ann. Rev. Info. Sci. Tech., 40: 521-543. p.525"
+  ]
+ },
+ "forum_romanum_en": {
+  "title": "Forum Romanum",
+  "objects": 14,
+  "attributes": 7,
+  "language": "English",
+  "description": "Ratings of monuments on the Forum Romanum in different travel guides.",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 1.26"
+  ]
+ },
+ "livingbeings_de": {
+  "title": "Lebewesen und Wasser",
+  "objects": 8,
+  "attributes": 9,
+  "language": "German",
+  "description": "conditions different living beings need",
+  "source": [
+   "Ganter, B., & Wille, R. (1996). Formale Begriffsanalyse. Springer. p. 18"
+  ]
+ },
+ "livingbeings_en": {
+  "title": "Living beings and water",
+  "objects": 8,
+  "attributes": 9,
+  "language": "English",
+  "description": "conditions different living beings need",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 1.1"
+  ]
+ },
+ "missmarple_de": {
+  "title": "Mordmethoden in Miss-Marple-Romanen",
+  "objects": 12,
+  "attributes": 6,
+  "language": "German / English",
+  "description": "methods of murder in Miss Marple novels (not short stories!)",
+  "source": [
+   "Schott, B. (2004). Schotts Sammelsurium. Bloomsbury, Berlin"
+  ]
+ },
+ "missmarple_en": {
+  "title": "Methods of murder in Miss Marple novels",
+  "objects": 12,
+  "attributes": 6,
+  "language": "English",
+  "description": "methods of murder in Miss Marple novels (not short stories!)",
+  "source": [
+   "Schott, B. (2004). Schotts Sammelsurium. Bloomsbury, Berlin"
+  ]
+ },
+ "music_en": {
+  "title": "Music",
+  "objects": 31,
+  "attributes": 11,
+  "language": "English",
+  "description": "music and their characteristics",
+  "source": [
+   "Ganter, B., Wille, R., & Stumme, G. (2005). Formal Concept Analysis: Foundations and Applications (Vol. 3626). Springer, p. 22"
+  ]
+ },
+ "newzealand_en": {
+  "title": "New Zealand Leasure",
+  "objects": 13,
+  "attributes": 8,
+  "language": "English",
+  "description": "Places in New Zealand and offered activities",
+  "source": [
+   "DK Eyewitness Travel Guide New Zealand. Dorling Kindersley Publishing Inc. 2001."
+  ]
+ },
+ "officesupplies_de": {
+  "title": "Bürobedarf",
+  "objects": 8,
+  "attributes": 5,
+  "language": "German",
+  "description": "service offers of an office supplies business",
+  "source": [
+   "Ganter, B., & Wille, R. (1996). Formale Begriffsanalyse. Springer. p. 25"
+  ]
+ },
+ "officesupplies_en": {
+  "title": "Office supply services",
+  "objects": 8,
+  "attributes": 5,
+  "language": "English",
+  "description": "Office supply services",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 1.5"
+  ]
+ },
+ "planets_en": {
+  "title": "Planets",
+  "objects": 9,
+  "attributes": 7,
+  "language": "English",
+  "description": "size and distance of planets",
+  "source": [
+   "Anggraini, D. (2011). Analisis Perubahan Kelompok Berdasarkan Perubahan Nilai Jual Pada Bloomberg Market Data dengan Menggunakan Formal Concept Analysis, p. 7"
+  ]
+ },
+ "seasoningplanner_de": {
+  "title": "Gewürzplaner",
+  "objects": 56,
+  "attributes": 37,
+  "language": "German",
+  "description": "spices and herbs together and the meals they match",
+  "source": [
+   "Mahn, M. (2014). Gewürze: Das Standardwerk. Christian Verlag GmbH, München"
+  ]
+ },
+ "tealady": {
+  "title": "Tea Ladies",
+  "objects": 18,
+  "attributes": 14,
+  "language": null,
+  "description": "participation of social events by some ladies in Old City",
+  "source": [
+   "Wille, R. (1992). Concept Lattices and Conceptual Knowledge Systems. Computers & Mathematics with Applications, 23, 6-9, p. 493-515"
+  ]
+ },
+ "triangles_en": {
+  "title": "Triangles",
+  "objects": 7,
+  "attributes": 7,
+  "language": "English",
+  "description": "Properties of triangles.",
+  "source": [
+   "B. Ganter and R. Wille (2024). Formal Concept Analysis. Mathematical Foundations. Springer Nature Switzerland, Figure 2.4"
+  ]
+ }
+}

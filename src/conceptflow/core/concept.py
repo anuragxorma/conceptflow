@@ -40,6 +40,17 @@ class Concept:
             self, "intent", frozenset(operator.index(i) for i in self.intent)
         )
 
+    @classmethod
+    def _from_indices(cls, extent: frozenset[int], intent: frozenset[int]) -> "Concept":
+        """
+        Internal: a concept from frozensets of Python ints, without checking
+        and copying them again (the enumeration algorithms produce millions).
+        """
+        concept = object.__new__(cls)
+        object.__setattr__(concept, "extent", extent)
+        object.__setattr__(concept, "intent", intent)
+        return concept
+
     def signature(self) -> str:
         """
         Return a deterministic mathematical signature for this concept.
@@ -55,10 +66,15 @@ class Concept:
 
     def stable_id(self, prefix: str = "C", length: int = 12) -> str:
         """
-        Return a compact stable identifier derived from the concept signature.
+        Return a compact identifier derived from the concept's intent.
+
+        Within one lattice the intent determines the concept, so ids are
+        unique there. The id does not depend on the objects' order or on
+        which objects the data has: the same concept gets the same id after
+        rows are reordered or resampled (e.g. across cross-validation folds),
+        as long as the attributes (columns) stay the same.
         """
-        digest = hashlib.sha1(
-            self.signature().encode("utf-8")
-        ).hexdigest()[:length]
+        intent_part = ",".join(map(str, sorted(self.intent)))
+        digest = hashlib.sha1(f"intent:{intent_part}".encode("utf-8")).hexdigest()[:length]
 
         return f"{prefix}_{digest}"

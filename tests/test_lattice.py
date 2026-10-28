@@ -2,6 +2,7 @@ import numpy as np
 
 from conceptflow import ConceptLattice, FormalContext
 
+
 def make_context():
     return FormalContext(
         objects=["g1", "g2", "g3"],

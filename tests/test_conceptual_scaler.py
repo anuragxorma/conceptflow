@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.pipeline import Pipeline
 from scipy import sparse
+from sklearn.pipeline import Pipeline
 
 from conceptflow import FormalContext, ManyValuedContext
 from conceptflow.cluster import ConceptLatticeEstimator
 from conceptflow.preprocessing import (
     ConceptualScaler,
+    ContranominalScale,
     InterordinalScale,
     NominalScale,
     OrdinalScale,
@@ -374,7 +375,7 @@ def test_missing_unknown_dataframe_uses_float_nan():
         scales=MISSING_SCALES, output="dataframe", missing="unknown"
     ).fit_transform(make_missing_df())
 
-    assert all(dtype == float for dtype in out.dtypes)
+    assert all(dtype == np.float64 for dtype in out.dtypes.tolist())
     assert out.loc["g3", ["color=blue", "color=red"]].isna().all()
     assert out.loc["g2", ["score>=20", "score>=50"]].isna().all()
     assert out.loc["g1", "color=red"] == 1.0
@@ -409,3 +410,54 @@ def test_missing_policy_validation():
         ConceptualScaler(
             scales=MISSING_SCALES, output="sparse", missing="unknown"
         ).fit(make_missing_df())
+
+
+# ---------------------------------------------------------------------------
+# handle_unknown
+# ---------------------------------------------------------------------------
+
+
+def test_handle_unknown_ignore_for_learned_vocabularies():
+    train = pd.DataFrame({"color": ["red", "blue"], "size": ["S", "L"]})
+    test = pd.DataFrame({"color": ["green", "red"], "size": ["S", "S"]})
+    scales = [NominalScale("color"), ContranominalScale("color")]
+
+    with pytest.raises(ValueError, match="handle_unknown"):
+        ConceptualScaler(scales).fit(train).transform(test)
+
+    scaler = ConceptualScaler(scales, output="dataframe", handle_unknown="ignore")
+    out = scaler.fit(train).transform(test)
+    assert out.iloc[0].to_dict() == {
+        "color=blue": False, "color=red": False, "color!=blue": True, "color!=red": True,
+    }
+    assert out.iloc[1]["color=red"] and not out.iloc[1]["color!=red"]
+
+
+def test_handle_unknown_does_not_hide_errors_in_explicit_scales():
+    train = pd.DataFrame({"size": ["S", "L"]})
+    scaler = ConceptualScaler([OrdinalScale("size", levels=["S", "L"])], handle_unknown="ignore")
+    with pytest.raises(ValueError):
+        scaler.fit(train).transform(pd.DataFrame({"size": ["XL"]}))
+
+
+def test_handle_unknown_is_validated():
+    with pytest.raises(ValueError, match="handle_unknown"):
+        ConceptualScaler([NominalScale("a")], handle_unknown="skip").fit(pd.DataFrame({"a": ["x"]}))
+
+
+def test_cross_validation_with_rare_values():
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import cross_val_score
+    from sklearn.pipeline import make_pipeline
+
+    rng = np.random.default_rng(0)
+    color = rng.choice(["red", "blue", "green"], 60)
+    color[0] = "purple"  # appears once: missing from four of five training folds
+    X = pd.DataFrame({"color": color})
+    y = (color == "red").astype(int)
+    pipe = make_pipeline(
+        ConceptualScaler([NominalScale("color")], handle_unknown="ignore"),
+        LogisticRegression(),
+    )
+    scores = cross_val_score(pipe, X, y, cv=5, error_score="raise")
+    assert scores.mean() > 0.9

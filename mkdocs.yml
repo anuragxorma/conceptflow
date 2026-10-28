@@ -75,7 +75,8 @@ nav:
       - Visualization: guide/visualization.md
       - Nested line diagrams: guide/nested.md
       - Data quality: guide/quality.md
-      - Ordinal factorization: guide/decomposition.md
+      - Factorization: guide/decomposition.md
+      - Datasets: guide/datasets.md
   - Theory:
       - Nested diagram tutorial: nested_diagram_tutorial.md
       - Nested diagram construction: nested_diagram_construction.md
@@ -91,4 +92,7 @@ nav:
       - Visualization: api/visualization.md
       - Exploration: api/exploration.md
       - Decomposition: api/decomposition.md
+      - Datasets: api/datasets.md
+  - Benchmarks: benchmarks.md
+  - API stability: api-stability.md
   - Changelog: changelog.md

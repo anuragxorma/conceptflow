@@ -1,34 +1,26 @@
 """
-Concept lattice construction using CloseByOne.
+Concept lattice construction with Close-by-One, on Ganter & Wille's
+"living beings and water" context (bundled with ConceptFlow).
 
-Run from the project root:
+Run with:
 
     python examples/closebyone_lattice.py
 """
 
-import numpy as np
-
 import conceptflow as cf
-from conceptflow.cluster import ConceptLatticeEstimator
+from conceptflow.datasets import load_context
 
 
 def main():
-    context = cf.FormalContext.from_array(
-        np.array([
-            [1, 1, 0],
-            [1, 0, 1],
-            [0, 1, 1],
-        ]),
-        objects=["g1", "g2", "g3"],
-        attributes=["m1", "m2", "m3"],
-    )
-
-    lattice = ConceptLatticeEstimator(algorithm="closebyone").fit(context).get_lattice()
+    context = load_context("livingbeings_en")
+    lattice = cf.ConceptLattice.from_context(context, algorithm="closebyone")
+    same = cf.ConceptLattice.from_context(context, algorithm="nextclosure")
 
     print(context)
     print(lattice)
     print("Number of concepts:", lattice.n_concepts)
     print("Number of Hasse edges:", len(lattice.edges))
+    print("Same lattice as NextClosure:", lattice == same)
 
 
 if __name__ == "__main__":

@@ -19,11 +19,10 @@ Lattice indices return one number:
 from __future__ import annotations
 
 import warnings
-from fractions import Fraction
 
 import numpy as np
 
-from conceptflow.algorithms._bitset import BitsetContext, from_indices
+from conceptflow.algorithms._bitset import BitsetContext, from_indices, iter_bits
 from conceptflow.core.lattice import ConceptLattice
 
 # Cells per chunk of the pairwise (concepts x concepts) computations.
@@ -80,51 +79,43 @@ def concept_stability(lattice: ConceptLattice) -> np.ndarray:
 
     The stability of a concept ``(A, B)`` is the share of subsets ``C`` of
     ``A`` with ``C' = B``: how much the intent survives when objects are
-    removed. It is computed bottom-up: the subsets of ``A`` that generate
-    ``(A, B)`` are all ``2^|A|`` subsets minus those generating a strictly
-    smaller concept. Exact integers are used throughout.
+    removed. A subset keeps the intent iff it does not fit inside one of the
+    maximal proper sub-extents ``A_1, ..., A_r`` of ``A`` (the extents of
+    the lower neighbours), so by inclusion-exclusion
 
-    Needs the full lattice; use :func:`stability_bounds` or
-    :func:`delta_measure` on iceberg lattices.
+        |{C ⊆ A : C' = B}| = Σ_{S ⊆ {1..r}} (-1)^|S| 2^|A ∩ ⋂_{i∈S} A_i|.
+
+    The terms are collected by intersection (each intersection is an extent
+    below ``A``), so the cost depends on the concept's neighbourhood, not on
+    the size of the lattice; exact integers are used throughout. Only the
+    context is needed, so this also works on iceberg lattices.
     """
-    if lattice.is_iceberg:
-        raise ValueError(
-            "Exact stability needs the full lattice. On an iceberg lattice use "
-            "stability_bounds() or delta_measure()."
-        )
-    _warn_if_large(
-        lattice,
-        "Exact stability",
-        "stability_bounds() and delta_measure() are fast alternatives.",
-    )
+    bits = BitsetContext(lattice.context)
+    columns = bits.columns
+    stability = np.empty(lattice.n_concepts, dtype=float)
 
-    concepts = lattice.concepts
-    position = {concept: i for i, concept in enumerate(concepts)}
-    order = sorted(range(len(concepts)), key=lambda i: len(concepts[i].extent))
+    for i, concept in enumerate(lattice.concepts):
+        extent = from_indices(concept.extent)
+        missing = bits.all_attributes & ~from_indices(concept.intent)
+        candidates = {extent & columns[m] for m in iter_bits(missing)}
+        candidates.discard(extent)
 
-    # down[i]: bitset over concept positions of the strict downset of i.
-    down = [0] * len(concepts)
-    generators = [0] * len(concepts)
-    stability = np.empty(len(concepts), dtype=float)
+        maximal: list[int] = []
+        for candidate in sorted(candidates, key=int.bit_count, reverse=True):
+            if not any(candidate & kept == candidate for kept in maximal):
+                maximal.append(candidate)
 
-    for i in order:
-        concept = concepts[i]
-        strict_down = 0
-        for child in lattice.children(concept):
-            j = position[child]
-            strict_down |= down[j] | (1 << j)
-        down[i] = strict_down
+        # terms[I] = sum of (-1)^|S| over the subsets S with intersection I.
+        terms = {extent: 1}
+        for sub_extent in maximal:
+            updated = dict(terms)
+            for intersection, coefficient in terms.items():
+                key = intersection & sub_extent
+                updated[key] = updated.get(key, 0) - coefficient
+            terms = {key: c for key, c in updated.items() if c}
 
-        below = 0
-        mask = strict_down
-        while mask:
-            low = mask & -mask
-            below += generators[low.bit_length() - 1]
-            mask ^= low
-
-        total = 1 << len(concept.extent)
-        generators[i] = total - below
-        stability[i] = float(Fraction(generators[i], total))
+        generators = sum(c << key.bit_count() for key, c in terms.items())
+        stability[i] = generators / (1 << extent.bit_count())
 
     return stability
 

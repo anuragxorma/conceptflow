@@ -162,8 +162,9 @@ def lattice_to_graph_data(
         Concept lattice to convert.
 
     stable_ids:
-        If True, use concept-derived stable ids. If False, use compact local
-        ids such as c0, c1, c2.
+        If True, use ``Concept.stable_id()`` (derived from the intent, so the
+        same concept keeps its id when the objects are reordered). If False,
+        use compact local ids such as c0, c1, c2.
 
     Returns
     -------

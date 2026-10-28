@@ -167,7 +167,8 @@ Responsibilities:
 - incompatibility-graph methods,
 - order-theoretic decomposition.
 
-The full `Ord2Factor` algorithm is reserved for future implementation.
+`Ord2Factor` computes large ordinal two-factorizations of any context; the
+bipartite-subgraph methods it uses are in `decomposition/bipartite.py`.
 
 ---
 

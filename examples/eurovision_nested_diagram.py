@@ -33,14 +33,14 @@ import numpy as np
 import pandas as pd
 
 from conceptflow import ExplorationBuilder, FormalContext, ManyValuedContext
+from conceptflow.exploration import realized_pairs
 from conceptflow.preprocessing import DichotomicScale, GeneralScale, ThresholdScale
 from conceptflow.rules import ImplicationBasisEstimator
 from conceptflow.visualization import debug_bottom_outer, plot_nested
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
-from conceptflow.exploration import realized_pairs
 
-
-DATASET_ROOT = Path("examples/eurovision-dataset/data/senior")
+# Next to this script, so the example runs from any folder.
+DATASET_ROOT = Path(__file__).resolve().parent / "eurovision-dataset" / "data" / "senior"
 
 CLUSTER_SUPPORT_THRESHOLD = 8  # average points from cluster members
 
@@ -78,13 +78,19 @@ HISTORICAL_CLUSTERS = {
     "Former Soviet Union": ["AM", "AZ", "BY", "EE", "GE", "KZ", "LV", "LT", "MD", "RU", "UA"],
     "Former Yugoslavia": ["BA", "CS", "HR", "ME", "MK", "RS", "SI", "YU"],
     "Former Eastern Bloc": ["AL", "BG", "CZ", "HU", "PL", "RO", "SK"],
-    "Western Bloc": ["AU", "BE", "DE", "DK", "ES", "FR", "GB", "GB-WLS", "GR", "IL", "IS", "IT", "LU", "NL", "NO", "PT", "TR"],
+    "Western Bloc": [
+        "AU", "BE", "DE", "DK", "ES", "FR", "GB", "GB-WLS", "GR",
+        "IL", "IS", "IT", "LU", "NL", "NO", "PT", "TR",
+    ],
     "Neutral": ["AD", "AT", "CH", "FI", "IE", "MC", "SE", "SM"],
     "Non-Aligned Movement": ["CY", "MA", "MT"],
 }
 
 POLITICAL_CLUSTERS = {
-    "EU Eurozone": ["AT", "BE", "BG", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES"],
+    "EU Eurozone": [
+        "AT", "BE", "BG", "HR", "CY", "EE", "FI", "FR", "DE", "GR", "IE",
+        "IT", "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES",
+    ],
     "EU Non-Eurozone": ["CZ", "DK", "HU", "PL", "RO", "SE"],
     "EU Candidates": ["AL", "BA", "GE", "MD", "ME", "MK", "RS", "TR", "UA"],
     "EFTA / EEA": ["CH", "IS", "NO"],
@@ -186,12 +192,15 @@ def load_year_record(year: int) -> dict | None:
     historical_name = cluster_of(country, HISTORICAL_CLUSTERS)
     political_name = cluster_of(country, POLITICAL_CLUSTERS)
 
+    def support(clusters, name):
+        return got_cluster_support(clusters, name, country, eligible_voters, votes)
+
     return {
         "country": country,
-        "regional": got_cluster_support(REGIONAL_CLUSTERS, regional_name, country, eligible_voters, votes),
-        "cultural": got_cluster_support(CULTURAL_CLUSTERS, cultural_name, country, eligible_voters, votes),
-        "historical": got_cluster_support(HISTORICAL_CLUSTERS, historical_name, country, eligible_voters, votes),
-        "political": got_cluster_support(POLITICAL_CLUSTERS, political_name, country, eligible_voters, votes),
+        "regional": support(REGIONAL_CLUSTERS, regional_name),
+        "cultural": support(CULTURAL_CLUSTERS, cultural_name),
+        "historical": support(HISTORICAL_CLUSTERS, historical_name),
+        "political": support(POLITICAL_CLUSTERS, political_name),
         "bpm": bpm,
         "key_mode": key_mode(tone),
     }
@@ -454,7 +463,8 @@ def compute_implication_basis(root) -> list[dict]:
             for ic in ic_list:
                 if ic.stable_id() == bot_i or ic.stable_id() in filled:
                     continue
-                combined = frozenset(oi[oc.stable_id()]) | frozenset(a + n_outer for a in ii[ic.stable_id()])
+                inner_attributes = frozenset(a + n_outer for a in ii[ic.stable_id()])
+                combined = frozenset(oi[oc.stable_id()]) | inner_attributes
                 if P <= combined and not ((P | Pcl_minus_P) <= combined):
                     n_unfilled += 1
 
@@ -507,7 +517,10 @@ def main() -> None:
 
     print("\nMusic distribution:")
     print("  bpm (slow <100 / medium 100–149 / fast >=150):")
-    print(f"    slow={(df['bpm'] < 100).sum()}  medium={((df['bpm'] >= 100) & (df['bpm'] < 150)).sum()}  fast={(df['bpm'] >= 150).sum()}")
+    slow = (df["bpm"] < 100).sum()
+    medium = ((df["bpm"] >= 100) & (df["bpm"] < 150)).sum()
+    fast = (df["bpm"] >= 150).sum()
+    print(f"    slow={slow}  medium={medium}  fast={fast}")
     print(f"  key_mode: {df['key_mode'].value_counts().to_dict()}")
 
     # Build year → "CC YEAR" display map before dropping country from the MVC.
@@ -524,11 +537,12 @@ def main() -> None:
     root = builder.root(
         name="Eurovision winners: voting cluster support",
         scales=[
-             GeneralScale("political",  mapping={True: {"political_support"},  False: frozenset()}, attribute_order=["political_support"]),
-            GeneralScale("regional",   mapping={True: {"regional_support"},   False: frozenset()}, attribute_order=["regional_support"]),
-            GeneralScale("cultural",   mapping={True: {"cultural_support"},   False: frozenset()}, attribute_order=["cultural_support"]),
-            GeneralScale("historical", mapping={True: {"historical_support"}, False: frozenset()}, attribute_order=["historical_support"]),
-           
+            GeneralScale(
+                kind,
+                mapping={True: {f"{kind}_support"}, False: frozenset()},
+                attribute_order=[f"{kind}_support"],
+            )
+            for kind in ("political", "regional", "cultural", "historical")
         ],
     )
 

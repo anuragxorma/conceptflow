@@ -26,6 +26,7 @@ import pytest
 from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from conceptflow.cluster import ConceptLatticeEstimator
+from conceptflow.decomposition import ASSO, GreConD, Ord2Factor
 from conceptflow.feature_extraction import ConceptMembershipEncoder
 from conceptflow.preprocessing import ConceptualScaler, NominalScale, ThresholdScale
 from conceptflow.rules import ImplicationBasisEstimator, ImplicationOutlierDetector
@@ -111,3 +112,29 @@ def test_nominal_vocabulary_is_fixed_at_fit_time():
     # Refitting on the same data is idempotent.
     refit = ConceptualScaler(scales=[NominalScale("color")]).fit(train)
     assert np.array_equal(refit.transform(train), scaler.transform(train))
+
+
+@parametrize_with_checks(
+    [
+        GreConD(),
+        GreConD(min_coverage=0.8, n_components=3),
+        ASSO(),
+        ASSO(n_components=2, threshold=0.5),
+    ]
+)
+def test_boolean_factorization_sklearn_checks(estimator, check):
+    check(estimator)
+
+
+# ExactOrdinalTwoFactorizer is not checked here: it only accepts
+# two-factorizable contexts and rejects the random data the checks use.
+# Ord2Factor factorizes any context.
+@parametrize_with_checks(
+    [
+        Ord2Factor(),
+        Ord2Factor(method="greedy", random_state=0),
+        Ord2Factor(method="annealing", n_iterations=50, random_state=0),
+    ]
+)
+def test_ord2factor_sklearn_checks(estimator, check):
+    check(estimator)

@@ -15,7 +15,11 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.core import ConceptLattice as CoreConceptLattice
 from conceptflow.validation import check_binary_context_input
-from conceptflow.validation.input import check_feature_names, remember_feature_names
+from conceptflow.validation.input import (
+    check_feature_names,
+    check_output_param,
+    remember_feature_names,
+)
 
 
 class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
@@ -101,8 +105,7 @@ class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
         return self
 
     def _fit_from_lattice(self, lattice: CoreConceptLattice) -> None:
-        if self.output not in {"dataframe", "array", "sparse"}:
-            raise ValueError('output must be "dataframe", "array", or "sparse".')
+        check_output_param(self)
 
         self.context_ = lattice.context
         self.lattice_ = lattice
@@ -119,6 +122,7 @@ class ConceptMembershipEncoder(TransformerMixin, BaseEstimator):
         Transform objects into concept-membership features.
         """
         check_is_fitted(self, "concepts_")
+        check_output_param(self)
 
         check_feature_names(self, X)
         context = check_binary_context_input(X)

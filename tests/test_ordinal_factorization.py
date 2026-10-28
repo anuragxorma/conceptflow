@@ -6,8 +6,8 @@ from conceptflow.decomposition import (
     ExactOrdinalTwoFactorizer,
     bipartite_coloring,
     complement_context,
-    incompatibility_graph,
     incidence_pairs,
+    incompatibility_graph,
     is_ferrers_relation,
 )
 from conceptflow.decomposition.ordinal_factorization import Ord2Factor
@@ -147,9 +147,9 @@ def test_exact_ordinal_two_factorizer_fits_contranominal_dimension_three():
     assert is_ferrers_relation(factor_2.relation, ctx)
 
 
-def test_ord2factor_stub_is_not_implemented():
+def test_ord2factor_factorizes_a_two_factorizable_context_completely():
     ctx = make_chain_context()
-    model = Ord2Factor()
+    model = Ord2Factor().fit(ctx)
 
-    with pytest.raises(NotImplementedError):
-        model.fit(ctx)
+    assert model.coverage_ == 1.0
+    assert model.removed_incidence_ == frozenset()

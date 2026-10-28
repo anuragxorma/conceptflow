@@ -7,6 +7,8 @@ using explicit conceptual scale definitions.
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 import pandas as pd
 from scipy import sparse
@@ -15,7 +17,7 @@ from sklearn.utils.validation import check_is_fitted
 
 from conceptflow.core import FormalContext, IncompleteContext, ManyValuedContext
 from conceptflow.core.incomplete_context import is_missing
-from conceptflow.preprocessing.scales import Scale
+from conceptflow.preprocessing.scales import Scale, UnknownValueError
 
 
 class ConceptualScaler(TransformerMixin, BaseEstimator):
@@ -56,12 +58,31 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
           Unknown entries are independent of each other, so implications
           that follow from a scale itself (e.g. ``size>=L -> size>=M``) can
           be reported as "possible" by ``IncompleteContext.implication_status``.
+
+    handle_unknown:
+        What ``transform`` does with a value that ``NominalScale`` or
+        ``ContranominalScale`` did not see during ``fit`` (as in
+        scikit-learn's ``OneHotEncoder``):
+
+        - "error": raise a ValueError (default);
+        - "ignore": the value equals none of the known values, so the object
+          gets no ``x=v`` attribute and every ``x!=v`` attribute. Useful in
+          cross-validation, where a rare value may be missing from a
+          training fold. Scales with explicitly given values (ordinal,
+          dichotomic, general) still raise.
     """
 
-    def __init__(self, scales=None, output: str = "array", missing: str = "error"):
+    def __init__(
+        self,
+        scales=None,
+        output: str = "array",
+        missing: str = "error",
+        handle_unknown: str = "error",
+    ):
         self.scales = scales
         self.output = output
         self.missing = missing
+        self.handle_unknown = handle_unknown
 
     def fit(self, X, y=None):
         """
@@ -78,24 +99,27 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
         if not isinstance(self.scales, list):
             raise TypeError("scales must be a list of Scale objects.")
 
+        scales = []
         for scale in self.scales:
             if not isinstance(scale, Scale):
                 raise TypeError("Every entry in scales must be a Scale object.")
+            scale = self._resolve_position(scale, mvc)
 
             if scale.source_attribute not in mvc.attributes:
                 raise KeyError(
                     f'Scale refers to unknown source attribute '
                     f'"{scale.source_attribute}".'
                 )
+            scales.append(scale)
 
         self._validate_output_params()
 
         if self.missing == "error":
-            for scale in self.scales:
+            for scale in scales:
                 self._check_no_missing(mvc, scale.source_attribute)
 
         self.input_context_ = mvc
-        self.scales_ = list(self.scales)
+        self.scales_ = scales
         self.feature_names_in_ = mvc.attributes
         self.n_features_in_ = mvc.n_attributes
         self.object_names_in_ = mvc.objects
@@ -103,10 +127,26 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         return self
 
+    @staticmethod
+    def _resolve_position(scale: Scale, mvc: ManyValuedContext) -> Scale:
+        """A copy of a scale given by column position, naming that column."""
+        position = getattr(scale, "source_position", None)
+        if position is None:
+            return scale
+        if not 0 <= position < mvc.n_attributes:
+            raise IndexError(
+                f"Scale refers to column position {position}, but the data has "
+                f"{mvc.n_attributes} columns."
+            )
+        resolved = copy.copy(scale)
+        resolved.source_attribute = mvc.attributes[position]
+        return resolved
+
     def __setstate__(self, state):
         # Scalers pickled before the ``missing`` parameter existed (0.1.x)
         # behave like the current default.
         state.setdefault("missing", "error")
+        state.setdefault("handle_unknown", "error")
         super().__setstate__(state)
 
     def _validate_output_params(self) -> None:
@@ -117,6 +157,9 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         if self.missing not in {"error", "false", "unknown"}:
             raise ValueError('missing must be one of "error", "false", or "unknown".')
+
+        if self.handle_unknown not in {"error", "ignore"}:
+            raise ValueError('handle_unknown must be "error" or "ignore".')
 
         if self.missing == "unknown" and self.output == "sparse":
             raise ValueError(
@@ -265,46 +308,6 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         return attrs
 
-    def _scale_object(
-        self,
-        obj: str,
-        mvc: ManyValuedContext,
-    ) -> dict[str, bool | None]:
-        binary_row: dict[str, bool | None] = {}
-
-        for scale in self.scales_:
-            value = mvc.get_value(obj, scale.source_attribute)
-
-            if is_missing(value):
-                if self.missing == "error":
-                    self._check_no_missing(mvc, scale.source_attribute)
-
-                if self.missing == "false":
-                    encoded = {
-                        attr: False
-                        for attr in scale.binary_attributes(self.input_context_)
-                    }
-                else:
-                    encoded = self._unknown_encoding(scale)
-            else:
-                # Vocabulary is always resolved from the fit-time context, even
-                # when scaling transform-time data, so scales whose binary
-                # attributes are derived from observed values (NominalScale,
-                # ContranominalScale) stay fixed between fit and transform
-                # instead of silently drifting with whatever data is passed in.
-                encoded = scale.encode_value(value, self.input_context_)
-
-            overlap = set(binary_row) & set(encoded)
-            if overlap:
-                raise ValueError(
-                    "Binary attribute name collision detected during scaling: "
-                    f"{sorted(overlap)}"
-                )
-
-            binary_row.update(encoded)
-
-        return binary_row
-
     def _unknown_encoding(self, scale: Scale) -> dict[str, bool | None]:
         """
         Encode a missing value as three-valued attributes.
@@ -328,19 +331,65 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
         return result
 
     def _scale_to_dataframe(self, mvc: ManyValuedContext) -> pd.DataFrame:
-        data = []
+        # Column by column: each distinct value is encoded once.
+        columns: dict[str, list] = {}
 
-        for obj in mvc.objects:
-            row_encoding = self._scale_object(obj, mvc)
-            row = [row_encoding.get(attr, False) for attr in self.scaled_attributes_]
-            data.append(row)
+        for scale in self.scales_:
+            attributes = scale.binary_attributes(self.input_context_)
+            values = mvc.column(scale.source_attribute).tolist()
+            missing = [is_missing(value) for value in values]
+            if self.missing == "error" and any(missing):
+                self._check_no_missing(mvc, scale.source_attribute)
+
+            cache: dict = {}
+            rows = []
+            for value, is_gap in zip(values, missing):
+                if is_gap:
+                    key = ("missing",)
+                else:
+                    try:
+                        key = (type(value), value)
+                        hash(key)
+                    except TypeError:
+                        key = None  # unhashable: not cached
+                encoded = cache.get(key) if key is not None else None
+                if encoded is None:
+                    encoded = self._encode(scale, value, is_gap)
+                    if key is not None:
+                        cache[key] = encoded
+                rows.append(encoded)
+
+            for attribute in attributes:
+                if attribute in columns:
+                    raise ValueError(
+                        "Binary attribute name collision detected during scaling: "
+                        f"{[attribute]}"
+                    )
+                columns[attribute] = [row.get(attribute, False) for row in rows]
 
         return pd.DataFrame(
-            data,
+            {attribute: columns[attribute] for attribute in self.scaled_attributes_},
             index=mvc.objects,
             columns=self.scaled_attributes_,
             dtype="boolean" if self.missing == "unknown" else bool,
         )
+
+    def _encode(self, scale: Scale, value, is_gap: bool) -> dict[str, bool | None]:
+        if is_gap:
+            if self.missing == "false":
+                return {attr: False for attr in scale.binary_attributes(self.input_context_)}
+            return self._unknown_encoding(scale)
+        # Vocabulary is always resolved from the fit-time context, even when
+        # scaling transform-time data, so scales whose binary attributes are
+        # derived from observed values (NominalScale, ContranominalScale)
+        # stay fixed between fit and transform.
+        try:
+            return scale.encode_value(value, self.input_context_)
+        except UnknownValueError:
+            fallback = scale.encode_unknown(self.input_context_)
+            if self.handle_unknown == "ignore" and fallback is not None:
+                return fallback
+            raise
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()

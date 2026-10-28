@@ -371,10 +371,11 @@ def debug_bottom_outer(view: ExplorationView) -> None:
         if iid is not None:
             pair = (oid, iid)
             obj_name = outer_obj_names[obj_idx]
+            atomic = f"atomic pair: γ_outer({obj_name!r})={oid}, γ_inner({obj_name!r})={iid}"
             if pair not in pair_reason:
-                pair_reason[pair] = f"atomic pair: γ_outer({obj_name!r})={oid}, γ_inner({obj_name!r})={iid}"
+                pair_reason[pair] = atomic
             elif "bottom pair" in pair_reason[pair]:
-                pair_reason[pair] += f" + atomic pair: γ_outer({obj_name!r})={oid}, γ_inner({obj_name!r})={iid}"
+                pair_reason[pair] += f" + {atomic}"
             else:
                 pair_reason[pair] += f" + atomic({obj_name!r})"
 
@@ -571,7 +572,7 @@ def exploration_view_to_nested_data(
 
             # Intent-based lookup: attribute indices are invariant across views
             # built from the same scale, so frozenset(intent indices) is a
-            # reliable cross-view key even though stable_ids differ.
+            # reliable cross-view key (stable_ids are derived from it too).
             pnode_by_intent: dict[frozenset, dict[str, Any]] = {}
             if per_concept_data is not None:
                 for pnode in per_concept_data["nodes"]:
@@ -1136,7 +1137,10 @@ function updateHeader() {{
   const scales = currentView.scale_names && currentView.scale_names.length
     ? currentView.scale_names.join(", ")
     : "none";
-  subtitleEl.text(`view depth ${{currentView.depth}} · scales: ${{scales}} · concepts: ${{currentView.nodes.length}}`);
+  subtitleEl.text(
+    `view depth ${{currentView.depth}} · scales: ${{scales}} · ` +
+    `concepts: ${{currentView.nodes.length}}`
+  );
   breadcrumbEl.text(nameStack.join(" → "));
   backButton.property("disabled", viewStack.length === 0);
   rootButton.property("disabled", currentView === rootData);
@@ -1383,9 +1387,15 @@ function getStyledSVGString() {{
     .inner-edge {{ stroke: #777; stroke-width: 0.8; opacity: 0.8; }}
     .inner-node {{ fill: white; stroke: #333; stroke-width: 0.8; }}
     .inner-node.filled {{ fill: #1f4e79; stroke: #1f4e79; }}
-    .attr-label {{ font-size: 10px; text-anchor: middle; dominant-baseline: auto; fill: #1a1a2e; font-weight: 600; paint-order: stroke; stroke: white; stroke-width: 4px; stroke-linejoin: round; }}
-    .obj-label {{ font-size: 9px; text-anchor: middle; dominant-baseline: hanging; fill: #444; font-style: italic; paint-order: stroke; stroke: white; stroke-width: 3px; stroke-linejoin: round; }}
-    .inner-attr {{ font-size: 5px; text-anchor: middle; dominant-baseline: auto; fill: #1a1a2e; paint-order: stroke; stroke: white; stroke-width: 2px; stroke-linejoin: round; }}
+    .attr-label {{ font-size: 10px; text-anchor: middle; dominant-baseline: auto;
+      fill: #1a1a2e; font-weight: 600; paint-order: stroke; stroke: white;
+      stroke-width: 4px; stroke-linejoin: round; }}
+    .obj-label {{ font-size: 9px; text-anchor: middle; dominant-baseline: hanging;
+      fill: #444; font-style: italic; paint-order: stroke; stroke: white;
+      stroke-width: 3px; stroke-linejoin: round; }}
+    .inner-attr {{ font-size: 5px; text-anchor: middle; dominant-baseline: auto;
+      fill: #1a1a2e; paint-order: stroke; stroke: white; stroke-width: 2px;
+      stroke-linejoin: round; }}
   `;
   const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
   styleEl.textContent = css;

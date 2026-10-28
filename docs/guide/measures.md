@@ -35,11 +35,13 @@ for i in most_stable:
     print(round(stability[i], 3), len(concept.extent), sorted(concept.intent))
 ```
 
-Exact stability needs the full lattice, and its cost grows quadratically
-with the number of concepts (it warns above 20,000). The bounds (Buzmakov,
-Kuznetsov & Napoli, 2014) and the Δ-measure only need each concept's lower
-neighbours: they are fast and also work on
-[iceberg lattices](lattices.md#iceberg-lattices).
+Exact stability is computed per concept from its lower neighbours, by
+inclusion–exclusion over their extents, so it needs only the context: it
+also works on [iceberg lattices](lattices.md#iceberg-lattices), and its cost
+depends on each concept's neighbourhood rather than on the size of the
+lattice (all 238,710 concepts of the Mushroom data take about 40 s). The
+bounds (Buzmakov, Kuznetsov & Napoli, 2014) and the Δ-measure are cheaper
+still.
 
 ## Δ-measure
 

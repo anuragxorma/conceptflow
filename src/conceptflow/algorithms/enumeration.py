@@ -22,7 +22,7 @@ import warnings
 from collections.abc import Iterable
 from itertools import chain, combinations
 
-from conceptflow.algorithms._bitset import BitsetContext, to_indices
+from conceptflow.algorithms._bitset import BitsetContext, iter_bits, to_indices
 from conceptflow.algorithms._registry import normalize_enumeration_algorithm
 from conceptflow.algorithms.derivation import (
     attribute_closure,
@@ -155,7 +155,7 @@ def _intent_of(extent: int, columns: list[int]) -> int:
 
 
 def _to_concept(extent: int, intent: int) -> Concept:
-    return Concept(extent=to_indices(extent), intent=to_indices(intent))
+    return Concept._from_indices(to_indices(extent), to_indices(intent))
 
 
 def enumerate_concepts_nextclosure(
@@ -215,13 +215,37 @@ def _closebyone_bitsets(
     """
     Close-by-One on integer bitsets; returns ``(extent, intent)`` pairs.
 
+    Uses FCbO's pruning (Krajča, Outrata and Vychodil, "Advances in
+    algorithms based on CbO", CLA 2010): when extending a concept by ``j``
+    fails the canonicity test, the failed intent is remembered and passed
+    to the children; a child skips ``j`` without computing anything if the
+    remembered intent would fail again (it has an attribute below ``j`` that
+    the child's intent lacks).
+
     Concepts with fewer than ``min_extent_size`` objects are pruned with
     their whole subtree: extending a concept only shrinks its extent, and a
     concept's canonical generation path runs through larger extents only,
     so no concept above the threshold is lost.
     """
     columns = bits.columns
+    rows = bits.rows
     n_attributes = bits.n_attributes
+    all_attributes = bits.all_attributes
+
+    def intent_of(extent: int, known: int) -> int:
+        # Intersect the rows of the extent's objects when there are few of
+        # them; otherwise test each remaining attribute's column.
+        rest = all_attributes & ~known
+        if extent.bit_count() < 2 * rest.bit_count():
+            result = all_attributes
+            for g in iter_bits(extent):
+                result &= rows[g]
+            return result | known
+        result = known
+        for m in iter_bits(rest):
+            if not extent & ~columns[m]:
+                result |= 1 << m
+        return result
 
     if bits.n_objects < min_extent_size:
         # Not even the top concept is frequent; it is still returned, so an
@@ -231,35 +255,39 @@ def _closebyone_bitsets(
         return [(bits.all_objects, _intent_of(bits.all_objects, columns))]
 
     found: list[tuple[int, int]] = []
-    stack = [(bits.all_objects, _intent_of(bits.all_objects, columns), 0)]
+    # Frames: extent, intent, first attribute to try, failed intents per attribute.
+    stack = [(bits.all_objects, _intent_of(bits.all_objects, columns), 0, [0] * n_attributes)]
 
     while stack:
-        extent, intent, start = stack.pop()
+        extent, intent, start, failed = stack.pop()
         if guard is not None:
             guard.tick()
         found.append((extent, intent))
+        if intent == all_attributes:
+            continue
 
+        failed = list(failed)
+        children = []
         for j in range(start, n_attributes):
-            if intent >> j & 1:
+            bit = 1 << j
+            if intent & bit:
                 continue
+            below = bit - 1
+            if failed[j] & below & ~intent:
+                continue  # fails canonicity again (FCbO)
 
             new_extent = extent & columns[j]
-
             if new_extent.bit_count() < min_extent_size:
                 continue
 
-            if any(
-                not intent >> m & 1 and new_extent & columns[m] == new_extent
-                for m in range(j)
-            ):
-                continue
+            new_intent = intent_of(new_extent, intent | bit)
+            if new_intent & below & ~intent:
+                failed[j] = new_intent  # not canonical: generated elsewhere
+            else:
+                children.append((new_extent, new_intent, j + 1))
 
-            new_intent = intent | (1 << j)
-            for m in range(j + 1, n_attributes):
-                if not new_intent >> m & 1 and new_extent & columns[m] == new_extent:
-                    new_intent |= 1 << m
-
-            stack.append((new_extent, new_intent, j + 1))
+        for new_extent, new_intent, next_start in reversed(children):
+            stack.append((new_extent, new_intent, next_start, failed))
 
     return found
 

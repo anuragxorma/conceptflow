@@ -285,3 +285,46 @@ def test_figure_writers_create_folders_and_check_suffixes(tmp_path):
         tikz.write(tmp_path / "x.png")
     dot = plot_lattice(lattice, backend="graphviz")
     assert dot.write(tmp_path / "other" / "x.dot").exists()
+
+
+# ---------------------------------------------------------------------------
+# Audit leftovers fixed in 0.4.0
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "estimator",
+    ["ConceptLatticeEstimator", "ConceptMembershipEncoder", "ImplicationBasisEstimator"],
+)
+def test_output_is_checked_again_at_transform(estimator):
+    from conceptflow.cluster import ConceptLatticeEstimator  # noqa: F401
+    from conceptflow.feature_extraction import ConceptMembershipEncoder  # noqa: F401
+    from conceptflow.rules import ImplicationBasisEstimator  # noqa: F401
+
+    X = np.random.default_rng(0).random((10, 4)) < 0.5
+    model = locals()[estimator]().fit(X).set_params(output="list")
+    with pytest.raises(ValueError, match="output must be"):
+        model.transform(X)
+
+
+def test_estimators_reject_infinity_in_dataframes():
+    frame = pd.DataFrame({"a": [1.0, np.inf], "b": [0.0, 1.0]})
+    with pytest.raises(ValueError, match="infinity"):
+        check_binary_context_input(frame)
+    # A FormalContext still reads inf as a cross (numbers > 0 are crosses).
+    assert FormalContext.from_dataframe(frame).incidence[1, 0]
+
+
+def test_integer_scale_source_is_a_column_position():
+    integer_named = pd.DataFrame({0: ["a", "b"], 1: [1.0, 5.0]})
+    scaler = ConceptualScaler([NominalScale(0)], output="dataframe")
+    assert scaler.fit_transform(integer_named).columns.tolist() == ["0=a", "0=b"]
+
+    named = pd.DataFrame({"color": ["a", "b"], "size": [1.0, 5.0]})
+    scale = NominalScale(np.int64(0))
+    out = ConceptualScaler([scale], output="dataframe").fit_transform(named)
+    assert out.columns.tolist() == ["color=a", "color=b"]
+    assert scale.source_attribute == "x0"  # the user's scale is not modified
+
+    with pytest.raises(IndexError, match="column position 5"):
+        ConceptualScaler([NominalScale(5)]).fit(named)

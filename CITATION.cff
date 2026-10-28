@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use ConceptFlow in your research, please cite it as below."
+title: "ConceptFlow: Formal Concept Analysis for the scientific Python stack"
+type: software
+authors:
+  - family-names: Sharma
+    given-names: Anurag
+    orcid: "https://orcid.org/0009-0000-8292-3092"
+    affiliation: University of Kassel
+version: 0.4.0
+date-released: "2026-10-28"
+license: BSD-3-Clause
+repository-code: "https://github.com/anuragxorma/conceptflow"
+url: "https://conceptflow.readthedocs.io"
+abstract: >-
+  ConceptFlow is a Python library for Formal Concept Analysis (FCA):
+  formal contexts, concept lattices, implication bases, concept measures,
+  conceptual scaling, Boolean and ordinal factorization, and lattice
+  visualization, with scikit-learn compatible estimators.
+keywords:
+  - formal concept analysis
+  - FCA
+  - concept lattice
+  - scikit-learn
+  - implications
+  - conceptual scaling

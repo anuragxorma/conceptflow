@@ -1,0 +1,40 @@
+B
+Drive concepts
+5
+25
+
+Conventional
+Front-wheel
+Rear-wheel
+Mid-engine
+All-wheel
+Drive efficiency empty ++
+Drive efficiency empty +
+Drive efficiency empty -
+Drive efficiency loaded ++
+Drive efficiency loaded +
+Drive efficiency loaded -
+Road holding ++
+Road holding +
+Road holding --
+Self steering u
+Self steering o
+Self steering n
+Self steering u/n
+Space economy ++
+Space economy +
+Space economy -
+Space economy --
+Construction cost vl
+Construction cost l
+Construction cost m
+Construction cost h
+Maintainability ++
+Maintainability +
+Maintainability -
+Maintainability --
+..x.x..x.x....x....x.xx..
+.x...xxx.x...xx..xx...x..
+xx.xx...x.x....x..x...x..
+xx.xx..x...x...xx.x....xx
+xx.xx..x....x.x.....x..x.

@@ -49,9 +49,9 @@ cf.plot_lattice(lattice, backend="tikz", layout="layered").write("lattice.pdf")
 - **Concept lattices:** NextClosure and Close-by-One on bitsets, iceberg
   lattices, navigation (join, meet, up-sets, object and attribute concepts),
   explicit opt-in limits for very large lattices.
-- **Implications and rules:** canonical (Duquenne-Guigues) basis,
-  proper-premise basis, near-implications with exceptions (Luxenburger basis),
-  minimal generators.
+- **Implications and rules:** canonical (Duquenne-Guigues) basis with
+  LinCbO, proper-premise basis, near-implications with exceptions (Luxenburger
+  basis), minimal generators.
 - **Measures:** stability (exact and bounds), Δ-measure, entropy, information
   gain, linearity and distributivity indices.
 - **Conceptual scaling** of many-valued data with seven scale types and
@@ -63,6 +63,10 @@ cf.plot_lattice(lattice, backend="tikz", layout="layered").write("lattice.pdf")
   diagrams.
 - **Data quality:** rule violations, redundant objects and attributes,
   explanations of objects and rules.
+- **Factorization:** Boolean matrix factorization (GreConD, ASSO) as
+  scikit-learn transformers; ordinal two-factorization.
+- **Datasets:** the 20 contexts of the FCA repository (bundled), the UCI
+  Mushroom data and random contexts.
 
 ## Documentation
 
@@ -78,8 +82,10 @@ The documentation is at **[conceptflow.readthedocs.io](https://conceptflow.readt
   [visualization](https://conceptflow.readthedocs.io/en/latest/guide/visualization/),
   [nested diagrams](https://conceptflow.readthedocs.io/en/latest/guide/nested/),
   [data quality](https://conceptflow.readthedocs.io/en/latest/guide/quality/),
-  [ordinal factorization](https://conceptflow.readthedocs.io/en/latest/guide/decomposition/)
+  [factorization](https://conceptflow.readthedocs.io/en/latest/guide/decomposition/),
+  [datasets](https://conceptflow.readthedocs.io/en/latest/guide/datasets/)
 - [API reference](https://conceptflow.readthedocs.io/en/latest/api/core/)
+- [Benchmarks against fcapy and concepts](https://conceptflow.readthedocs.io/en/latest/benchmarks/)
 - [Changelog](https://conceptflow.readthedocs.io/en/latest/changelog/)
 
 The sources are in [`docs/`](https://github.com/anuragxorma/conceptflow/tree/main/docs).
@@ -93,6 +99,14 @@ mkdocs serve
 
 Runnable examples, including a full case study, are in
 [`examples/`](https://github.com/anuragxorma/conceptflow/tree/main/examples).
+
+## Citing and contributing
+
+If you use ConceptFlow in your research, please cite it; see
+[CITATION.cff](https://github.com/anuragxorma/conceptflow/blob/main/CITATION.cff)
+(or GitHub's "Cite this repository" button). Questions, bug reports and
+contributions are welcome; see
+[CONTRIBUTING.md](https://github.com/anuragxorma/conceptflow/blob/main/CONTRIBUTING.md).
 
 ## License
 

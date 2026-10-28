@@ -10,14 +10,12 @@ Implemented
 - complement context construction
 - incompatibility graph construction
 - bipartite graph coloring
-- an exact small-scale ordinal two-factorizer based on Algorithm 1 from
-  Dürrschnabel and Stumme's Ord2Factor paper
-
-Not yet implemented
--------------------
-The full Ord2Factor algorithm for maximal ordinal two-factorizations is not
-implemented yet. That algorithm additionally requires selecting large induced
-bipartite subgraphs of the incompatibility graph.
+- ``ExactOrdinalTwoFactorizer``: the two Ferrers factors of a
+  two-factorizable context (Algorithm 1 of Dürrschnabel and Stumme,
+  "Maximal Ordinal Two-Factorizations", ICCS 2023)
+- ``Ord2Factor``: large ordinal two-factorizations of any context
+  (Algorithm 2 of the same paper), with the bipartite-subgraph methods of
+  ``conceptflow.decomposition.bipartite``
 """
 
 from __future__ import annotations
@@ -31,7 +29,6 @@ from sklearn.base import BaseEstimator
 
 from conceptflow.core import ConceptLattice, FormalContext
 from conceptflow.validation import check_binary_context_input
-
 
 IncidencePair = tuple[int, int]
 
@@ -368,6 +365,8 @@ class ExactOrdinalTwoFactorizer(BaseEstimator):
             )
 
         self.context_ = context
+        self.n_features_in_ = context.n_attributes
+        self.feature_names_in_ = context.attributes
         self.incompatibility_graph_ = graph
         self.coloring_ = coloring
         self.complement_context_ = complement
@@ -384,22 +383,145 @@ class ExactOrdinalTwoFactorizer(BaseEstimator):
 
         return self
 
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.input_tags.sparse = True
+        return tags
+
 
 class Ord2Factor(BaseEstimator):
     """
-    Placeholder for the full maximal Ord2Factor algorithm.
+    Large ordinal two-factorizations of any context (Ord2Factor).
 
-    The full algorithm requires repeatedly selecting large induced bipartite
-    subgraphs of the incompatibility graph before applying exact ordinal
-    two-factorization. This is intentionally not implemented yet.
+    Algorithm 2 of Dürrschnabel & Stumme, "Maximal Ordinal
+    Two-Factorizations" (ICCS 2023): while the incompatibility graph of the
+    context is not bipartite, keep only the crosses of a large induced
+    bipartite subgraph of it (dropping the others) and rebuild the graph --
+    dropping crosses can create new incompatibilities, so this may repeat.
+    The remaining context is two-factorizable, and its two Ferrers factors
+    are computed as by ``ExactOrdinalTwoFactorizer`` (Algorithm 1).
+
+    Computing a maximal two-factorization is NP-hard, so the bipartite step
+    offers the methods of Dürrschnabel, Hanika & Stumme (2022):
+
+    Parameters
+    ----------
+    method:
+        ``"exact"`` (default): a smallest set of crosses to drop, from the
+        papers' SAT formulation solved with MiniSat 2.2 (exponential in the
+        worst case; meant for small contexts). ``"greedy"``: an
+        locally minimal set (Algorithm 1 of the 2022 paper), in polynomial
+        time. ``"annealing"``: the
+        greedy result improved by simulated annealing.
+
+    n_iterations, temperature:
+        Steps and starting temperature of ``method="annealing"``.
+
+    random_state:
+        Seed for the heuristics' random choices.
+
+    lattice_algorithm:
+        Concept enumeration algorithm for the complement lattice.
+
+    Attributes
+    ----------
+    factors_:
+        The two ordinal factors (Ferrers relations, sets of incidence pairs).
+
+    removed_incidence_:
+        The crosses that are not covered (dropped to make the context
+        two-factorizable).
+
+    covered_incidence_, coverage_:
+        The covered crosses and their share of all crosses.
+
+    n_rounds_:
+        How often crosses were dropped (0 if the context was already
+        two-factorizable).
+
+    reduced_context_:
+        The two-factorizable context that was factorized.
     """
 
-    def __init__(self, strategy: str = "maximal_bipartite"):
-        self.strategy = strategy
+    def __init__(
+        self,
+        method: str = "exact",
+        n_iterations: int = 1000,
+        temperature: float = 1.0,
+        random_state=None,
+        lattice_algorithm: str = "nextclosure",
+    ):
+        self.method = method
+        self.n_iterations = n_iterations
+        self.temperature = temperature
+        self.random_state = random_state
+        self.lattice_algorithm = lattice_algorithm
+
+    def _deletion(self, graph, rng):
+        from conceptflow.decomposition.bipartite import (
+            annealing_bipartite_deletion,
+            greedy_bipartite_deletion,
+            minimum_bipartite_deletion,
+        )
+
+        if self.method == "exact":
+            return minimum_bipartite_deletion(graph)
+        if self.method == "greedy":
+            return greedy_bipartite_deletion(graph, random_state=rng)
+        return annealing_bipartite_deletion(
+            graph, self.n_iterations, self.temperature, random_state=rng
+        )
 
     def fit(self, X, y=None):
-        raise NotImplementedError(
-            "Full Ord2Factor is not implemented yet. "
-            "Use ExactOrdinalTwoFactorizer for contexts that already admit "
-            "an exact ordinal two-factorization."
+        """Find two ordinal factors covering a large part of X's crosses."""
+        from sklearn.utils import check_random_state
+
+        from conceptflow.decomposition.bipartite import is_bipartite
+
+        if self.method not in {"exact", "greedy", "annealing"}:
+            raise ValueError('method must be "exact", "greedy" or "annealing".')
+        if self.method == "annealing" and (
+            isinstance(self.n_iterations, bool)
+            or not isinstance(self.n_iterations, (int, np.integer))
+            or self.n_iterations < 0
+        ):
+            raise ValueError("n_iterations must be a non-negative integer.")
+
+        context = check_binary_context_input(X)
+        rng = check_random_state(self.random_state)
+        incidence = np.array(context.incidence, dtype=bool)
+        removed: set[IncidencePair] = set()
+        rounds = 0
+
+        while True:
+            current = FormalContext(context.objects, context.attributes, incidence)
+            graph = incompatibility_graph(current)
+            if is_bipartite(graph):
+                break
+            dropped = self._deletion(graph, rng)
+            for g, m in dropped:
+                incidence[g, m] = False
+            removed |= dropped
+            rounds += 1
+
+        exact = ExactOrdinalTwoFactorizer(lattice_algorithm=self.lattice_algorithm).fit(current)
+
+        self.context_ = context
+        self.n_features_in_ = context.n_attributes
+        self.feature_names_in_ = context.attributes
+        self.reduced_context_ = current
+        self.removed_incidence_ = frozenset(removed)
+        self.n_rounds_ = rounds
+        self.factorization_ = exact.factorization_
+        self.factors_ = exact.factors_
+        self.covered_incidence_ = exact.covered_incidence_
+        all_incidence = incidence_pairs(context)
+        self.coverage_ = (
+            len(self.covered_incidence_) / len(all_incidence) if all_incidence else 1.0
         )
+        return self
+
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.input_tags.sparse = True
+        return tags

@@ -98,7 +98,9 @@ def test_lattice_to_graph_data_dimflux_handles_multi_word_names():
     # The real (space-containing) names must still show up in the output --
     # sanitizing names for DimFlux internally must not leak into labels.
     all_labels = " ".join(node.label for node in graph_data.nodes)
-    assert "lives in water" in all_labels or "needs chlorophyll" in all_labels or "can move" in all_labels
+    assert any(
+        name in all_labels for name in ("lives in water", "needs chlorophyll", "can move")
+    )
 
 
 def test_dimflux_handles_object_and_attribute_sharing_a_name():
