@@ -98,3 +98,44 @@ def test_plot_lattice_d3_backend_accepts_custom_size_and_title():
     assert "Custom lattice" in fig.html
     assert "width=\"720\"" in fig.html
     assert "min-height: 800px" in fig.html
+
+
+def _page_data(html):
+    """The JSON the page draws from."""
+    import json
+    import re
+
+    return json.loads(re.search(r"const graphData = (.*);\n", html).group(1))
+
+
+def test_d3_uses_reduced_labels():
+    ctx = FormalContext.from_array(
+        np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]]),
+        objects=["g1", "g2", "g3", "g4"],
+        attributes=["a", "b", "c"],
+    )
+    lattice = ConceptLattice.from_context(ctx)
+    graph_data = lattice_to_graph_data(lattice)
+    nodes = _page_data(render_graph_data_html(graph_data))["nodes"]
+    for node, concept in zip(nodes, lattice.concepts):
+        attributes = [
+            a for j, a in enumerate(ctx.attributes) if lattice.attribute_concept(j) == concept
+        ]
+        objects = [
+            g for i, g in enumerate(ctx.objects) if lattice.object_concept(i) == concept
+        ]
+        assert node["attribute_text"] == ", ".join(sorted(attributes))
+        assert node["object_text"] == ", ".join(sorted(objects))
+    assert "labelForNode(d));" not in render_graph_data_html(graph_data)
+
+
+def test_d3_label_options():
+    graph_data = lattice_to_graph_data(make_lattice())
+    nodes = _page_data(
+        render_graph_data_html(graph_data, show_attribute_labels=False, object_label=str.upper)
+    )["nodes"]
+    assert all(node["attribute_text"] == "" for node in nodes)
+    assert sorted(node["object_text"] for node in nodes if node["object_text"]) == ["G1", "G2"]
+    many = FormalContext.from_array(np.ones((1, 8)), objects=["g"], attributes=list("abcdefgh"))
+    html = plot_lattice(ConceptLattice.from_context(many), layout="layered", max_label_items=2).html
+    assert "a, b, +6" in html

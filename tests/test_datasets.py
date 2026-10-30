@@ -181,3 +181,14 @@ def test_make_random_context_rejects_bad_sizes(arguments):
 def test_make_random_context_rejects_bad_density():
     with pytest.raises(ValueError, match="density"):
         make_random_context(3, 3, density=1.5)
+
+
+def test_make_random_context_accepts_numpy_generators():
+    # As documented; scikit-learn's check_random_state alone rejects them.
+    first = make_random_context(6, 5, 0.4, random_state=np.random.default_rng(3))
+    again = make_random_context(6, 5, 0.4, random_state=np.random.default_rng(3))
+    assert first == again and first.n_objects == 6 and first.n_attributes == 5
+    # Ints and RandomState give the same contexts as before.
+    assert make_random_context(6, 5, 0.4, random_state=3) == make_random_context(
+        6, 5, 0.4, random_state=np.random.RandomState(3)
+    )

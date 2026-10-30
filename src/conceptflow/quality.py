@@ -112,10 +112,12 @@ class RedundancyReport:
     derivable_attributes:
         Attribute -> other attributes whose extents intersect to exactly its
         extent: the column can be computed from them (it is reducible).
-        Duplicates and universal attributes are reported above instead.
+        Duplicate, universal and empty attributes are reported above
+        instead.
 
     derivable_objects:
         The same for objects: the row is the intersection of other rows.
+        Duplicate, full and empty objects are reported above instead.
     """
 
     duplicate_objects: list[tuple[str, ...]] = field(default_factory=list)

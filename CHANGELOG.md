@@ -1,5 +1,140 @@
 # Changelog
 
+## 0.5.0 (2026-10-30)
+
+Mostly fixes from audits of the whole package: every part was checked
+against brute force or the definitions in the literature. The visualization
+had most of the bugs; line diagrams and nested line diagrams are now also
+tested in a real browser in CI. Two results change on purpose: Ord2Factor's
+greedy and annealing methods (now inclusion-minimal, see *Changed*) and the
+coordinates of some layouts (edges are kept off unrelated concepts, see
+*Fixed*).
+
+ConceptFlow is now **beta** (it was alpha/experimental): results are tested
+against independent references, and the API changes only with deprecation
+warnings, as described in the API stability policy.
+
+### Deprecated
+
+- `debug_filled_pairs` and `debug_bottom_outer` in
+  `conceptflow.visualization`: development tools that only print. They keep
+  working with a `DeprecationWarning` and will be removed in 0.6.0; the
+  filled pairs are available as data from
+  `conceptflow.exploration.realized_pairs`.
+
+### Removed
+
+- `conceptflow.model_selection`: an empty placeholder package, never
+  documented. scikit-learn's own `GridSearchCV` and `cross_val_score` work
+  with ConceptFlow's estimators in pipelines.
+
+### Changed
+
+- `Ord2Factor` uses `method="annealing"` by default instead of `"exact"`.
+  The exact SAT method is exponential: about 20 seconds for a 15 x 15
+  context, and it ran for hours a little beyond, without a warning.
+  Annealing gave the same results on small contexts and takes seconds on
+  larger ones. `"exact"` gets a time limit, `max_time` (default 60 seconds;
+  `None` for none), after which `fit` raises `TimeoutError`;
+  `minimum_bipartite_deletion` has the same `max_time` (default: none).
+- `Ord2Factor(method="greedy")` and `method="annealing"` (and
+  `greedy_bipartite_deletion`, `annealing_bipartite_deletion`) now return
+  inclusion-minimal results, as the paper states: they end with a pass that
+  keeps every cross whose return still allows two ordinal factors. The
+  paper's algorithms alone left a droppable cross in about a fifth of small
+  random cases. Greedy results improve noticeably (11% fewer dropped crosses
+  on 60 random contexts; on `triangles_en` 3 instead of 10), so results
+  differ from 0.4.0.
+- The interactive pages load D3 in an exact version (7.9.0) instead of the
+  newest 7.x, so a D3 release cannot change existing diagrams.
+- New browser tests (`tests/test_browser.py`) open the interactive pages in
+  headless Firefox: drawing, reduced labels, clicks, nested navigation,
+  downloads, narrow pages and notebook embedding. They run in CI and are
+  skipped locally unless Playwright is installed.
+- The visualization guide has a *Known limitations* section.
+- `tests/test_oracles.py` checks the mathematical core against independent
+  references written from the definitions (concepts, bases, generators,
+  Luxenburger basis, stability, incomplete contexts, GreConD and ASSO as in
+  their papers, optimal ordinal factorization, nested diagrams, ordinal
+  scales). The browser tests wait for conditions instead of fixed times.
+- The architecture page describes the current package (it still listed
+  planned parts and an outdated estimator name); `read_csv` and
+  `redundancy_report` document how they treat short rows and empty
+  attributes.
+
+### Fixed
+
+- A `GraphData` built by hand (without the labels `lattice_to_graph_data`
+  stores) could label an object of an iceberg lattice at a concept that is
+  not its object concept. `lattice_to_graph_data` now records `is_iceberg`
+  and `min_support` in the graph's metadata, and the derived labels leave
+  such objects out.
+- Integer positions out of range in `object_derivation` and similar
+  methods now say when a name with that number exists (names are strings:
+  `"5"`, not `5`).
+- `write_cxt`, `write_json` and `write_csv` create missing folders, like the
+  figure writers already did.
+- `make_random_context` rejected NumPy Generators
+  (`random_state=np.random.default_rng(0)`), although its documentation
+  promised them; ints and `RandomState` give the same contexts as before.
+- Line diagrams could draw an edge straight through a concept it does not
+  connect, so the drawing showed cover relations that do not exist (layered
+  layout: 7 of the bundled and test contexts, e.g. `animals_en`; DimFlux: 4,
+  e.g. `missmarple_de`). Both layouts now move such concepts sideways, keeping
+  every concept's height and the straight edges of the FCA convention. A
+  concept is only moved where it keeps its distance to all others, so some
+  edges in crowded layered rows can still pass close to a node; lattices
+  above 2000 concepts are left as they are.
+- LaTeX in attribute and object names was shown verbatim, e.g. `\sqrt{3}`
+  in the bundled triangles data. Line diagrams (interactive, matplotlib,
+  Graphviz) and nested diagrams (interactive and matplotlib) now show
+  common LaTeX as symbols (`\sqrt{3}` → √3, `\alpha` → α, `\leq` → ≤,
+  `x^2` → x²; `$…$` around LaTeX is dropped), and TikZ typesets it in math
+  mode. Other names are shown unchanged.
+- The interactive nested diagram showed attribute names rewritten: the part
+  before `=` was dropped and underscores were title-cased, so `color!=red`
+  appeared as `red` and `smoker=yes` and `married=yes` both as `yes`. Names
+  are now shown exactly as given.
+- Clicking one of the small preview dots inside a bubble of the interactive
+  nested diagram did nothing; it now opens that bubble's view.
+- An `object_label` function returning something other than a string (e.g.
+  `len`) crashed the matplotlib backend; every backend now converts the
+  result to text.
+- Interactive line diagrams drew every node with an 18 px radius and nested
+  diagrams every bubble with 48 px, so on larger lattices nodes overlapped
+  and could not be clicked. The radius now shrinks where nodes are close, so
+  neighbouring nodes never overlap, and line diagrams can be zoomed in far
+  enough to bring small nodes back to full size.
+- The interactive line diagram wrote each concept's full intent under its
+  node, so labels were long and overlapped. It now uses reduced labelling
+  like the other backends (attributes above, objects below) and accepts
+  `show_attribute_labels`, `show_object_labels`, `max_label_items` and
+  `object_label`. The full extent and intent stay in the tooltip and the
+  details panel.
+- "Save PDF" in the interactive nested diagram wrote an uncompressed image:
+  6.9 MB for a ten-node diagram. It now writes a vector PDF (sharp at any
+  zoom, a few KB) through svg2pdf.js; for names outside Latin-1, which
+  jsPDF's standard fonts cannot show, it writes a compressed image (about
+  200 KB).
+- With several interactive figures in one Jupyter notebook only the first
+  was drawn (the others failed with "redeclaration of let rootLayer"), and
+  the figures' styles leaked into the notebook. Notebooks now show each
+  figure in its own frame, sized to the figure. `write_html` and `open`
+  still write the plain page.
+- In notebooks without ipywidgets, the first DimFlux layout printed
+  "TqdmWarning: IProgress not found" (from fcapy, a DimFlux dependency,
+  which imports tqdm.auto); it is no longer shown.
+- Interactive pages narrower than 560 px put the details panel below the
+  drawing instead of leaving the drawing too little (or negative) width.
+- Invalid plotting options now raise a clear `ValueError` or `TypeError`
+  instead of drawing nonsense: a non-positive interactive `width` or
+  `height`; negative or
+  non-integer `max_label_items`; TikZ `width_cm` ≤ 0; `layered_layout` with
+  `x_spacing` or `y_spacing` ≤ 0 or negative `sweeps`.
+- `ExplorationBuilder.root`, `expand` and `expand_all` raise a clear
+  `TypeError` when `scales` is not a list of `Scale` objects (e.g. when the
+  name is passed in its place).
+
 ## 0.4.0 (2026-10-28)
 
 ### Added

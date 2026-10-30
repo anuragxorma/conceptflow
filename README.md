@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green)
 [![Documentation](https://readthedocs.org/projects/conceptflow/badge/?version=latest)](https://conceptflow.readthedocs.io)
-![Status](https://img.shields.io/badge/status-experimental-orange)
+![Status](https://img.shields.io/badge/status-beta-yellow)
 
 ConceptFlow is a Python library for **Formal Concept Analysis (FCA)** that
 fits into the scientific Python stack. Its machine-learning parts are proper

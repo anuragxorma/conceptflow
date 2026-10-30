@@ -445,7 +445,7 @@ def _compute_filled_pairs(
 ```
 
 This is how ConceptFlow originally computed the filled pairs, and it is still
-what `debug_filled_pairs` reproduces with provenance. `plot_nested` now uses
+what the deprecated `debug_filled_pairs` (removed in 0.6.0) reproduces with provenance. `plot_nested` now uses
 `conceptflow.exploration.realized_pairs`, which checks each pair directly: a pair
 $(c, d)$ is filled iff $(A_c \cap A_d)'$ is exactly $B_c \cup B_d$, i.e. iff
 $B_c \cup B_d$ is an intent of the combined context. That gives the same set of

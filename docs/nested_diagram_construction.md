@@ -108,7 +108,7 @@ For every pair (c_outer, c_inner) it intersects the two extents and checks that
 the result derives back to exactly intent(c_outer) in K_outer and exactly
 intent(c_inner) in K_inner — i.e. that intent(c_outer) ∪ intent(c_inner) is an
 intent of K.  Sections 4–5 describe the equivalent join-closure construction,
-which `debug_filled_pairs` still uses to explain where each pair comes from.
+which the deprecated `debug_filled_pairs` (removed in 0.6.0) uses to explain where each pair comes from.
 
 ---
 
@@ -190,8 +190,8 @@ of φ equals the join-closure of {φ(γ(g)) : g ∈ G} ∪ {φ(⊥_K)}.
 ### Implementation
 
 The join-closure can be applied directly in the factor lattices using the
-atomic pairs from Section 4 in place of {φ(γ(g))} (this is what
-`debug_filled_pairs` does).  This is valid by the bridging lemma:
+atomic pairs from Section 4 in place of {φ(γ(g))} (this is what the
+deprecated `debug_filled_pairs` does).  This is valid by the bridging lemma:
 
 ```
 if (c_o, c_i), (c_o′, c_i′) ∈ P  then add  (c_o ∨ c_o′,  c_i ∨ c_i′)  to P

@@ -14,13 +14,19 @@ The geometry is the same as the matplotlib export.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable
+from numbers import Real
 from pathlib import Path
 from typing import Any
 
+from sklearn.utils import check_scalar
+
+from conceptflow.visualization._checks import check_max_label_items, object_formatter
+from conceptflow.visualization._text import LATEX_FRAGMENT
 from conceptflow.visualization.graph_data import GraphData
 
 _LATEX_SPECIALS = {
@@ -46,10 +52,25 @@ def latex_escape(text: str) -> str:
     )
 
 
+def latex_label(name: str) -> str:
+    """
+    ``name`` for a TikZ label: LaTeX such as ``\\sqrt{3}`` is typeset in math
+    mode, everything else escaped.
+    """
+    text = re.sub(r"\$([^$]*\\[^$]*)\$", r"\1", str(name))
+    parts, end = [], 0
+    for match in LATEX_FRAGMENT.finditer(text):
+        parts.append(latex_escape(text[end:match.start()]))
+        parts.append(f"${match.group(0)}$")
+        end = match.end()
+    parts.append(latex_escape(text[end:]))
+    return "".join(parts)
+
+
 def _join(items: list[str], max_items: int | None) -> str:
     if max_items is not None and len(items) > max_items:
         items = [*items[:max_items], f"+{len(items) - max_items}"]
-    return ", ".join(latex_escape(item) for item in items)
+    return ", ".join(latex_label(item) for item in items)
 
 
 def _scaling(points: dict, width_cm: float):
@@ -57,6 +78,7 @@ def _scaling(points: dict, width_cm: float):
     The map that centres ``points`` and scales them to ``width_cm`` (along
     the longer side), and its scale factor.
     """
+    check_scalar(width_cm, "width_cm", Real, min_val=0, include_boundaries="neither")
     xs = [x for x, _ in points.values()] or [0.0]
     ys = [y for _, y in points.values()] or [0.0]
     span = max(max(xs) - min(xs), max(ys) - min(ys))
@@ -134,11 +156,12 @@ def graph_data_to_tikz(
     """
     from conceptflow.visualization.static import _lattice_positions, _reduced_labels
 
+    check_max_label_items(max_label_items)
     graph_data, positions = _lattice_positions(graph_data)
     transform, _ = _scaling(positions, width_cm)
     positions = {node_id: transform(point) for node_id, point in positions.items()}
     attributes_at, objects_at = _reduced_labels(graph_data)
-    format_object = object_label or (lambda name: name)
+    format_object = object_formatter(object_label)
     name = {node.node_id: f"c{i}" for i, node in enumerate(graph_data.nodes)}
 
     body = []
@@ -178,6 +201,7 @@ def nested_data_to_tikz(
     """
     from conceptflow.visualization.static import _nested_geometry
 
+    check_max_label_items(max_label_items)
     geometry = _nested_geometry(data)
     scale_point, factor = _scaling(geometry["centers"], width_cm)
     centers = {node_id: scale_point(point) for node_id, point in geometry["centers"].items()}
@@ -292,7 +316,9 @@ class TikZFigure:
                 [latex, "-interaction=nonstopmode", "-halt-on-error", tex.name],
                 cwd=directory,
                 capture_output=True,
-                text=True,
+                # LaTeX writes UTF-8; the platform default may not be (Windows).
+                encoding="utf-8",
+                errors="replace",
             )
             pdf = tex.with_suffix(".pdf")
             if result.returncode != 0 or not pdf.exists():

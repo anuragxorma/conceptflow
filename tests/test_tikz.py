@@ -46,7 +46,7 @@ def test_lattice_tikz_structure(layout):
 
 def test_standalone_document_written_for_tex(tmp_path):
     path = plot_lattice(make_lattice(), backend="tikz", layout="layered").write(tmp_path / "l.tex")
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert text.startswith("\\documentclass[tikz")
     assert "\\begin{tikzpicture}" in text and text.rstrip().endswith("\\end{document}")
 

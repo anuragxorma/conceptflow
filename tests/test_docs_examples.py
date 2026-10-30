@@ -36,7 +36,7 @@ INLINE_RESULT = re.compile(r"^(\s*)print\((.*)\)\s+#\s+(.+)$")
 
 
 def python_blocks(page: Path) -> list[str]:
-    return [code for skip, code in BLOCK.findall(page.read_text()) if not skip]
+    return [code for skip, code in BLOCK.findall(page.read_text(encoding="utf-8")) if not skip]
 
 
 def checked(code: str) -> str:

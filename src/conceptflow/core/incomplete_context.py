@@ -280,8 +280,13 @@ class IncompleteContext:
         for item in items:
             if _is_index(item):
                 if not 0 <= item < len(names):
+                    hint = (
+                        f" Integers are positions; for the {kind} named '{item}', "
+                        f"pass the string '{item}'."
+                        if str(item) in index_of else ""
+                    )
                     raise IndexError(
-                        f"{kind} index {item} is out of range for {len(names)} {kind}s."
+                        f"{kind} index {item} is out of range for {len(names)} {kind}s.{hint}"
                     )
                 resolved.append(int(item))
             else:

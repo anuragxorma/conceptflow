@@ -236,6 +236,8 @@ def lattice_to_graph_data(
             "n_objects": lattice.context.n_objects,
             "n_attributes": lattice.context.n_attributes,
             "n_concepts": lattice.n_concepts,
+            "is_iceberg": lattice.is_iceberg,
+            "min_support": lattice.min_support,
             "stable_ids": stable_ids,
             "layout": None,
         },

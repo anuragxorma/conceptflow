@@ -16,191 +16,79 @@ visualization and exploration logic.
 
 # Architectural layers
 
+Each subpackage has one job; the arrows of dependence point towards `core/`.
+
 ## `core/`
 
-The mathematical foundation of the framework.
-
-Contains:
-
-- `FormalContext`
-- `Concept`
-- `ConceptLattice`
-- many-valued contexts
-
-Responsibilities:
-
-- closure operators,
-- derivation operators,
-- lattice representation,
-- concept structure.
-
-The `core/` layer is intentionally independent from:
-- visualization,
-- machine learning,
-- rendering backends.
-
----
+The mathematical foundation: `FormalContext`, `Concept`, `ConceptLattice`
+(with navigation: parents, children, join, meet, up- and down-sets),
+`ManyValuedContext`, `IncompleteContext` (three-valued contexts with
+certain/possible answers) and the context operations (`apposition`,
+`subposition`, `direct_sum`, `direct_product`, `complement`, `dual`).
+Independent of visualization, machine learning and rendering.
 
 ## `algorithms/`
 
-Contains FCA algorithms operating on the core structures.
-
-Examples:
-
-- NextClosure
-- CloseByOne
-- derivation operators
-- concept enumeration
-- canonical (Duquenne-Guigues) basis computation
-
-Responsibilities:
-
-- exact FCA computation,
-- enumeration algorithms,
-- order-theoretic algorithms.
-
-This layer should remain computation-focused and renderer-independent.
-
----
-
-## `preprocessing/`
-
-Contains conceptual scaling and sklearn-compatible preprocessing tools.
-
-Examples:
-
-- `ConceptualScaler`
-- nominal scaling
-- ordinal scaling
-- threshold scaling
-
-Responsibilities:
-
-- transformation from many-valued data into formal contexts,
-- sklearn pipeline compatibility,
-- sparse feature generation.
-
----
-
-## `cluster/`
-
-Contains sklearn-style lattice estimators.
-
-Examples:
-
-- `ConceptLattice`
-
-Responsibilities:
-
-- estimator wrappers,
-- sklearn-compatible interfaces,
-- pipeline integration.
-
-This layer bridges FCA computation with machine learning workflows.
-
----
-
-## `feature_extraction/`
-
-Transforms FCA structures into machine-learning feature representations.
-
-Examples:
-
-- `ConceptMembershipEncoder`
-
-Responsibilities:
-
-- concept-derived feature spaces,
-- sparse symbolic representations,
-- interpretable feature extraction.
-
----
+Exact FCA computation on the core structures: derivation and closure,
+concept enumeration (NextClosure, Close-by-One with FCbO pruning, brute
+force; iceberg lattices), cover relations, the canonical (Duquenne–Guigues)
+basis (LinCbO, NextClosure), the proper-premise basis, the Luxenburger basis
+of association rules, minimal generators, and clarification and reduction of
+contexts.
 
 ## `metrics/`
 
-Contains FCA metrics and implication measures.
+Measures of concepts and rules: support, confidence and exceptions of
+implications; exact stability, its bounds and the Δ-measure; entropy and
+information gain with respect to labels; linearity and distributivity
+indices.
 
-Examples:
+## `preprocessing/`
 
-- support
-- confidence
+Conceptual scaling of many-valued data into formal contexts:
+`ConceptualScaler` (a scikit-learn transformer) with nominal,
+contranominal, dichotomic, ordinal, threshold, interordinal and general
+scales, missing-value policies and handling of values unseen during fit.
 
-Responsibilities:
+## `cluster/`, `feature_extraction/`, `rules/`, `decomposition/`
 
-- implication analysis,
-- rule quality measures,
-- symbolic metric computation.
+scikit-learn estimators on top of the algorithms:
 
----
+- `cluster.ConceptLatticeEstimator` and
+  `feature_extraction.ConceptMembershipEncoder`: concept-membership
+  features, optionally from an iceberg lattice or the most stable concepts;
+- `rules.ImplicationBasisEstimator` (premise-satisfaction features) and
+  `rules.ImplicationOutlierDetector` (objects breaking rules that hold for
+  almost all others);
+- `decomposition.GreConD` and `decomposition.ASSO` (Boolean matrix
+  factorization), `decomposition.Ord2Factor` and
+  `ExactOrdinalTwoFactorizer` (ordinal two-factorization, with the bipartite
+  subgraph methods in `decomposition/bipartite.py`).
 
-## `rules/`
+`validation/` holds the input checks they share.
 
-Contains the sklearn-compatible wrapper around canonical-basis computation.
+## `exploration/`
 
-Examples:
-
-- `ImplicationBasisEstimator`
-
-Responsibilities:
-
-- fitting the Duquenne-Guigues (stem) basis from binary data,
-- transforming objects into premise-satisfaction feature vectors.
-
-The underlying algorithm (`compute_canonical_basis`, `Implication`) lives in
-`algorithms/implications.py`; this module only adds the `fit`/`transform`
-estimator on top of it.
-
----
-
-## `decomposition/`
-
-Contains FCA decomposition and factorization methods.
-
-Examples:
-
-- `ExactOrdinalTwoFactorizer`
-
-Responsibilities:
-
-- ordinal factorization,
-- Ferrers relations,
-- incompatibility-graph methods,
-- order-theoretic decomposition.
-
-`Ord2Factor` computes large ordinal two-factorizations of any context; the
-bipartite-subgraph methods it uses are in `decomposition/bipartite.py`.
-
----
-
-## `io/`
-
-Input/output functionality.
-
-Examples:
-
-- Burmeister `.cxt` support
-
-Responsibilities:
-
-- serialization,
-- dataset interchange,
-- external FCA compatibility.
-
----
+Nested conceptual exploration: `ExplorationBuilder` scales a many-valued
+context step by step into a tree of `ExplorationView`s;
+`nested_view`/`realized_pairs` compute nested line diagrams of two
+contexts.
 
 ## `visualization/`
 
-Visualization and exploration infrastructure.
+Line diagrams and nested line diagrams. Lattices are first turned into
+backend-neutral `GraphData`, laid out (DimFlux or a layered layout, both
+keeping edges off unrelated concepts) and then rendered: interactive D3
+pages (`HTMLFigure`), matplotlib, TikZ or Graphviz.
 
-Planned responsibilities:
+## `io/`, `datasets/`, `quality`
 
-- backend-neutral graph structures,
-- layout algorithms,
-- DimFlux integration,
-- interactive exploration,
-- nested diagrams.
-
-Visualization is intentionally separated from FCA computation.
+- `io`: Burmeister `.cxt`, FCART/fcapy JSON and CSV files.
+- `datasets`: the bundled FCA-repository contexts, downloads from
+  fcarepository.org, the UCI Mushroom data and random contexts.
+- `quality`: data-quality reports (duplicate, constant and derivable
+  objects and attributes; rule violations; explanations of objects and
+  rules).
 
 ---
 
@@ -266,4 +154,4 @@ The architecture therefore prioritizes:
 - algorithmic extensibility,
 - mathematical clarity,
 - reproducibility,
-- experimental FCA workflows.
+- exploratory analysis of real data.

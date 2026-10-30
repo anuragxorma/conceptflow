@@ -96,10 +96,21 @@ def test_json_reads_fcart_and_plain_layouts():
 
 def test_csv_custom_values_and_strictness(tmp_path):
     path = tmp_path / "ctx.csv"
-    path.write_text(",a,b\no1,yes,no\no2,no,yes\n")
+    path.write_text(",a,b\no1,yes,no\no2,no,yes\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="Line 2, attribute 'a'"):
         read_csv(path)
 
     ctx = read_csv(path, true_values=["yes"], false_values=["no"])
     assert ctx.incidence.tolist() == [[True, False], [False, True]]
+
+
+def test_out_of_range_index_suggests_the_name():
+    import pandas as pd
+
+    context = FormalContext.from_dataframe(
+        pd.DataFrame([[1, 0], [0, 1]], index=[5, 6], columns=["m", "n"])
+    )
+    with pytest.raises(IndexError, match="pass the string '5'"):
+        context.object_derivation([5])
+    assert context.object_derivation(["5"]) == frozenset({0})

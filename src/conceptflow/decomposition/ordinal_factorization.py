@@ -20,12 +20,15 @@ Implemented
 
 from __future__ import annotations
 
+import numbers
+import time
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
 from sklearn.base import BaseEstimator
+from sklearn.utils import check_scalar
 
 from conceptflow.core import ConceptLattice, FormalContext
 from conceptflow.validation import check_binary_context_input
@@ -407,12 +410,15 @@ class Ord2Factor(BaseEstimator):
     Parameters
     ----------
     method:
-        ``"exact"`` (default): a smallest set of crosses to drop, from the
-        papers' SAT formulation solved with MiniSat 2.2 (exponential in the
-        worst case; meant for small contexts). ``"greedy"``: an
-        locally minimal set (Algorithm 1 of the 2022 paper), in polynomial
-        time. ``"annealing"``: the
-        greedy result improved by simulated annealing.
+        ``"annealing"`` (default): the greedy result improved by simulated
+        annealing; seconds even for contexts with hundreds of crosses, and
+        on small contexts as good as ``"exact"`` in our tests.
+        ``"exact"``: in each round a smallest set of crosses to drop, from
+        the papers' SAT formulation solved with MiniSat 2.2. Exponential:
+        about 20 s for a 15 x 15 context of density 0.4, hours a little
+        beyond; limited by ``max_time``. ``"greedy"``: an inclusion-minimal
+        set (Algorithm 1 of the 2022 paper, plus a final pass that keeps
+        every cross it can), in polynomial time, but often far worse.
 
     n_iterations, temperature:
         Steps and starting temperature of ``method="annealing"``.
@@ -422,6 +428,10 @@ class Ord2Factor(BaseEstimator):
 
     lattice_algorithm:
         Concept enumeration algorithm for the complement lattice.
+
+    max_time:
+        Time limit in seconds for ``method="exact"`` (default 60); ``fit``
+        raises ``TimeoutError`` once it is exceeded. ``None``: no limit.
 
     Attributes
     ----------
@@ -445,19 +455,21 @@ class Ord2Factor(BaseEstimator):
 
     def __init__(
         self,
-        method: str = "exact",
+        method: str = "annealing",
         n_iterations: int = 1000,
         temperature: float = 1.0,
         random_state=None,
         lattice_algorithm: str = "nextclosure",
+        max_time: float | None = 60.0,
     ):
         self.method = method
         self.n_iterations = n_iterations
         self.temperature = temperature
         self.random_state = random_state
         self.lattice_algorithm = lattice_algorithm
+        self.max_time = max_time
 
-    def _deletion(self, graph, rng):
+    def _deletion(self, graph, rng, deadline):
         from conceptflow.decomposition.bipartite import (
             annealing_bipartite_deletion,
             greedy_bipartite_deletion,
@@ -465,7 +477,10 @@ class Ord2Factor(BaseEstimator):
         )
 
         if self.method == "exact":
-            return minimum_bipartite_deletion(graph)
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise TimeoutError
+            return minimum_bipartite_deletion(graph, max_time=remaining)
         if self.method == "greedy":
             return greedy_bipartite_deletion(graph, random_state=rng)
         return annealing_bipartite_deletion(
@@ -486,19 +501,35 @@ class Ord2Factor(BaseEstimator):
             or self.n_iterations < 0
         ):
             raise ValueError("n_iterations must be a non-negative integer.")
+        if self.max_time is not None:
+            check_scalar(
+                self.max_time, "max_time", numbers.Real, min_val=0, include_boundaries="neither"
+            )
 
         context = check_binary_context_input(X)
         rng = check_random_state(self.random_state)
         incidence = np.array(context.incidence, dtype=bool)
         removed: set[IncidencePair] = set()
         rounds = 0
+        deadline = (
+            None if self.max_time is None or self.method != "exact"
+            else time.monotonic() + self.max_time
+        )
 
         while True:
             current = FormalContext(context.objects, context.attributes, incidence)
             graph = incompatibility_graph(current)
             if is_bipartite(graph):
                 break
-            dropped = self._deletion(graph, rng)
+            try:
+                dropped = self._deletion(graph, rng, deadline)
+            except TimeoutError:
+                raise TimeoutError(
+                    f'method="exact" did not finish within max_time={self.max_time} '
+                    "seconds: it is exponential in the size of the context. Use "
+                    'method="annealing" (the default) for larger contexts, or raise '
+                    "max_time (None: no limit)."
+                ) from None
             for g, m in dropped:
                 incidence[g, m] = False
             removed |= dropped

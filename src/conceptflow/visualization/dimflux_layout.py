@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from conceptflow.core import ConceptLattice, FormalContext
+from conceptflow.visualization._clearance import keep_edges_off_nodes
 from conceptflow.visualization.graph_data import GraphData, lattice_to_graph_data
 
 # Above this many concepts DimFlux typically needs minutes, regardless of
@@ -54,10 +55,14 @@ def _dimflux_coordinates(
     read each concept's extent alongside its coordinates.
     """
     # Imported lazily: dim_flux pulls in matplotlib.pyplot, sympy, odis and
-    # fcapy, which `import conceptflow` should not pay for.
-    from dim_flux.core.realizer import Realizer
-    from dim_flux.fdp.forces import ForceDirectedPlacement
-    from dim_flux.utils.variables import Variables
+    # fcapy, which `import conceptflow` should not pay for. fcapy imports
+    # tqdm.auto, which warns in notebooks without ipywidgets ("IProgress not
+    # found") although no progress bar is ever shown here.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="IProgress not found")
+        from dim_flux.core.realizer import Realizer
+        from dim_flux.fdp.forces import ForceDirectedPlacement
+        from dim_flux.utils.variables import Variables
 
     variables = Variables(_sanitized_dataframe(context), {}, timeout_ms=timeout_ms)
 
@@ -163,11 +168,14 @@ def lattice_to_graph_data_dimflux(
             )
         )
 
-    return GraphData(
-        nodes=new_nodes,
-        edges=graph_data.edges,
-        metadata={
-            **graph_data.metadata,
-            "layout": "dimflux",
-        },
+    # DimFlux can put three or more concepts on one line.
+    return keep_edges_off_nodes(
+        GraphData(
+            nodes=new_nodes,
+            edges=graph_data.edges,
+            metadata={
+                **graph_data.metadata,
+                "layout": "dimflux",
+            },
+        )
     )

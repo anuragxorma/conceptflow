@@ -89,8 +89,10 @@ def context_from_json(text: str) -> FormalContext:
 
 
 def write_json(context: FormalContext, path: str | Path) -> None:
-    """Write a context as FCART/fcapy JSON."""
-    Path(path).write_text(context_to_json(context), encoding="utf-8")
+    """Write a context as FCART/fcapy JSON (missing folders are created)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(context_to_json(context), encoding="utf-8")
 
 
 def read_json(path: str | Path) -> FormalContext:
@@ -107,9 +109,11 @@ def write_csv(
 ) -> None:
     """
     Write a context as CSV: a header row of attributes, then one row per
-    object starting with its name.
+    object starting with its name. Missing folders are created.
     """
-    with Path(path).open("w", newline="", encoding="utf-8") as file:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file, delimiter=delimiter)
         writer.writerow(["", *context.attributes])
         for name, row in zip(context.objects, context.incidence):
@@ -128,7 +132,9 @@ def read_csv(
 
     Cells must be one of ``true_values`` or ``false_values`` (surrounding
     whitespace is ignored); anything else raises ``ValueError`` naming the
-    cell, instead of being guessed.
+    cell, instead of being guessed. A row shorter than the header is padded
+    with empty cells (no cross), as some spreadsheet programs drop trailing
+    empty cells; a longer row raises ``ValueError``.
     """
     true_values, false_values = set(true_values), set(false_values)
 

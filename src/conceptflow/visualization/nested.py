@@ -33,8 +33,11 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from conceptflow._deprecation import warn_deprecated
 from conceptflow.exploration.combinations import realized_pairs
 from conceptflow.exploration.view import ExplorationView
+from conceptflow.visualization._checks import html_page_layout, object_formatter
+from conceptflow.visualization._text import display_text
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.html_figure import HTMLFigure, script_json
 
@@ -148,7 +151,15 @@ def debug_filled_pairs(view: ExplorationView) -> None:
         'join(<pair1>, <pair2>)' (the earliest derivable reason in BFS order)
 
     Ends with a focused block for the bottom-most outer concept.
+
+    .. deprecated:: 0.5.0
+        A development tool that only prints; removed in 0.6.0. The filled
+        pairs are available as data from
+        ``conceptflow.exploration.realized_pairs``.
     """
+    warn_deprecated(
+        "debug_filled_pairs", "conceptflow.exploration.realized_pairs", "0.6.0"
+    )
     top_concept = view.lattice.top()
     top_id = top_concept.stable_id()
     template_view = view.children.get(top_id)
@@ -301,7 +312,15 @@ def debug_bottom_outer(view: ExplorationView) -> None:
 
     Call this after building the ExplorationView tree but before or after
     plot_nested; it does not affect the diagram.
+
+    .. deprecated:: 0.5.0
+        A development tool that only prints; removed in 0.6.0. The filled
+        pairs are available as data from
+        ``conceptflow.exploration.realized_pairs``.
     """
+    warn_deprecated(
+        "debug_bottom_outer", "conceptflow.exploration.realized_pairs", "0.6.0"
+    )
     top_concept = view.lattice.top()
     top_id = top_concept.stable_id()
     template_view = view.children.get(top_id)
@@ -537,7 +556,7 @@ def exploration_view_to_nested_data(
 
         filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice)
 
-    _fmt_obj: Callable[[str], str] = object_label if object_label is not None else (lambda x: x)
+    _fmt_obj = object_formatter(object_label)
 
     nodes: list[dict[str, Any]] = []
 
@@ -689,6 +708,24 @@ def exploration_view_to_nested_data(
     }
 
 
+# Fields of the nested data that the page shows as text.
+_DISPLAYED_NAMES = {
+    "new_attrs", "new_objects", "extent", "intent", "scale_names", "hover", "name", "label",
+    "attribute_labels", "object_labels",
+}
+
+
+def _with_display_names(value, key=None):
+    """A copy of nested data with LaTeX in shown names turned into symbols."""
+    if isinstance(value, dict):
+        return {k: _with_display_names(v, k) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_with_display_names(v, key) for v in value]
+    if key in _DISPLAYED_NAMES and isinstance(value, str):
+        return display_text(value)
+    return value
+
+
 def render_nested_html(
     data: dict[str, Any],
     width: int = 900,
@@ -705,9 +742,13 @@ def render_nested_html(
     - Click a node with a child view: navigate into that child view.
     - Back / Root: navigate up.
     - Nodes at the outer level show the shared inner template (hollow/filled).
+
+    ``width`` includes the 280 px details panel, which moves below the
+    drawing in pages narrower than 560 px.
     """
-    data_json = script_json(data)
-    display_title = script_json(title or data["name"])
+    page = html_page_layout(width, height)
+    data_json = script_json(_with_display_names(data))
+    display_title = script_json(display_text(title or data["name"]))
     show_child_previews_json = json.dumps(show_child_previews)
 
     return f"""
@@ -715,8 +756,9 @@ def render_nested_html(
 <html>
 <head>
 <meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.3/dist/svg2pdf.umd.min.js"></script>
 <style>
   body {{
     margin: 0;
@@ -779,12 +821,12 @@ def render_nested_html(
 
   .conceptflow-body {{
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: {page['columns']};
     min-height: {height}px;
   }}
 
   .conceptflow-details {{
-    border-left: 1px solid #ddd;
+    {page['panel_border']}: 1px solid #ddd;
     background: #fafafa;
     padding: 12px;
     font-size: 12px;
@@ -871,6 +913,11 @@ def render_nested_html(
     stroke-width: 0.8;
   }}
 
+  /* Clicks on the preview go to the outer bubble underneath. */
+  .child-preview {{
+    pointer-events: none;
+  }}
+
   .inner-node.filled {{
     fill: #1f4e79;
     stroke: #1f4e79;
@@ -943,7 +990,7 @@ def render_nested_html(
   </div>
 
   <div class="conceptflow-body">
-    <svg id="conceptflow-nested-svg" width="{width - 280}" height="{height}"></svg>
+    <svg id="conceptflow-nested-svg" width="{page['drawing_width']}" height="{height}"></svg>
 
     <div id="conceptflow-details" class="conceptflow-details">
       <div class="details-title">Details</div>
@@ -955,7 +1002,7 @@ def render_nested_html(
 <script>
 const rootData = {data_json};
 const showChildPreviews = {show_child_previews_json};
-const svgWidth = {width - 280};
+const svgWidth = {page['drawing_width']};
 const svgHeight = {height};
 
 const svg = d3.select("#conceptflow-nested-svg");
@@ -994,6 +1041,17 @@ function extentSize(d) {{
   if (d.metadata != null && d.metadata.extent_size !== undefined) return d.metadata.extent_size;
   if (d.extent != null) return d.extent.length;
   return 0;
+}}
+
+function closestDistance(nodes) {{
+  const points = nodes.map(d => [d.screenX, d.screenY]).sort((a, b) => a[0] - b[0]);
+  let best = Infinity;
+  for (let i = 0; i < points.length; i++) {{
+    for (let j = i + 1; j < points.length && points[j][0] - points[i][0] < best; j++) {{
+      best = Math.min(best, Math.hypot(points[j][0] - points[i][0], points[j][1] - points[i][1]));
+    }}
+  }}
+  return best;
 }}
 
 function computeTransform(nodes, targetWidth, targetHeight, padding) {{
@@ -1067,20 +1125,6 @@ function escapeHtml(text) {{
 function formatList(values) {{
   if (!values || values.length === 0) return "∅";
   return escapeHtml(values.join(", "));
-}}
-
-function formatAttrLabel(name) {{
-  // "key_mode=minor" → "minor", "key_mode=major" → "major"
-  // (but leave "bpm>=100" unchanged — the char before = is >)
-  const idx = name.indexOf('=');
-  if (idx > 0 && name[idx - 1] !== '>' && name[idx - 1] !== '<') {{
-    return name.slice(idx + 1);
-  }}
-  // "political_support" → "Political Support"
-  return name.replace(/_/g, ' ')
-             .split(' ')
-             .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-             .join(' ');
 }}
 
 function showDefaultDetails() {{
@@ -1180,7 +1224,7 @@ function drawTemplatePreview(parentGroup, innerTemplate, filledInner, radius, sh
 
   const filledSet = new Set(filledInner);
   const innerSize = radius * 1.55;
-  const padding = 8;
+  const padding = Math.min(8, innerSize / 6);
 
   const transform = computeTransform(innerTemplate.nodes, innerSize, innerSize, padding);
 
@@ -1219,7 +1263,7 @@ function drawTemplatePreview(parentGroup, innerTemplate, filledInner, radius, sh
       .attr("class", "inner-attr")
       .attr("x", d => transform(d).x)
       .attr("y", d => transform(d).y - 6)
-      .text(d => d.new_attrs.map(formatAttrLabel).join(", "));
+      .text(d => d.new_attrs.join(", "));
   }}
 }}
 
@@ -1228,7 +1272,7 @@ function drawChildPreview(parentGroup, childData, radius) {{
   if (!childData) return;
 
   const innerSize = radius * 1.35;
-  const padding = 8;
+  const padding = Math.min(8, innerSize / 6);
 
   const transform = computeTransform(childData.nodes, innerSize, innerSize, padding);
 
@@ -1269,17 +1313,22 @@ function renderView(viewData) {{
 
   const hasTemplate = !!viewData.inner_template;
 
-  const transform = computeTransform(viewData.nodes, svgWidth, svgHeight, 100);
+  const transform = computeTransform(
+    viewData.nodes, svgWidth, svgHeight, Math.min(100, svgWidth / 6, svgHeight / 6)
+  );
   const nodeById = new Map(viewData.nodes.map(d => [d.id, d]));
 
   viewData.nodes.forEach(d => {{
     const p = transform(d);
     d.screenX = p.x;
     d.screenY = p.y;
-    // Outer level: uniform radius so the template preview fits uniformly.
-    // Inner level (click-through): all nodes same size.
-    d.radius = hasTemplate ? 48 : 18;
   }});
+  // One radius per view (so the template preview fits every bubble alike):
+  // 48 px for bubbles, 18 px for plain nodes, less where neighbours are close.
+  const radius = Math.max(
+    2, Math.min(hasTemplate ? 48 : 18, 0.45 * closestDistance(viewData.nodes))
+  );
+  viewData.nodes.forEach(d => {{ d.radius = radius; }});
 
   const edgeSelection = rootLayer
     .append("g")
@@ -1360,7 +1409,7 @@ function renderView(viewData) {{
       .attr("class", "attr-label")
       .attr("x", 0)
       .attr("y", -(d.radius + 10))
-      .text(d.new_attrs.map(formatAttrLabel).join(", "));
+      .text(d.new_attrs.join(", "));
   }});
 
   // Object labels BELOW each node — comma-separated on one line.
@@ -1452,7 +1501,44 @@ function savePNG() {{
 backButton.on("click", goBack);
 rootButton.on("click", goRoot);
 resetZoomButton.on("click", () => resetZoom(500));
+// Vector PDF (sharp at any zoom) through svg2pdf.js. jsPDF's standard fonts
+// cover Latin-1 only, so names with other characters (√, α, ...) and a
+// failed plugin load fall back to the image PDF below.
 function savePDF() {{
+  const svgEl = document.getElementById("conceptflow-nested-svg");
+  const latin1 = [...svgEl.querySelectorAll("text")]
+    .every(t => [...t.textContent].every(c => c.charCodeAt(0) < 256));
+  if (!window.jspdf?.jsPDF?.API?.svg || !latin1) {{
+    saveImagePDF();
+    return;
+  }}
+  const w = parseInt(svgEl.getAttribute("width"));
+  const h = parseInt(svgEl.getAttribute("height"));
+  const holder = document.createElement("div");
+  holder.style.cssText = "position: absolute; left: -10000px; top: 0;";
+  holder.innerHTML = getStyledSVGString();
+  const clone = holder.firstElementChild;
+  // White halos behind labels would be drawn over the text in the PDF, and
+  // jsPDF's fonts are Helvetica/Times/Courier in normal and bold.
+  clone.querySelector("style").textContent +=
+    " .attr-label, .obj-label, .inner-attr {{ stroke: none; }}" +
+    " text {{ font-family: helvetica; }} .attr-label {{ font-weight: bold; }}";
+  document.body.appendChild(holder);
+  const {{ jsPDF }} = window.jspdf;
+  const pdf = new jsPDF({{
+    orientation: w >= h ? "landscape" : "portrait",
+    unit: "px",
+    format: [w, h],
+    compress: true,
+  }});
+  const name = (currentView.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  pdf.svg(clone, {{ x: 0, y: 0, width: w, height: h }})
+    .then(() => pdf.save(name + ".pdf"))
+    .catch(() => saveImagePDF())
+    .finally(() => holder.remove());
+}}
+
+function saveImagePDF() {{
   const svgEl = document.getElementById("conceptflow-nested-svg");
   const w = parseInt(svgEl.getAttribute("width"));
   const h = parseInt(svgEl.getAttribute("height"));
@@ -1476,8 +1562,10 @@ function savePDF() {{
       orientation: w >= h ? "landscape" : "portrait",
       unit: "px",
       format: [w, h],
+      compress: true,
     }});
-    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h);
+    // Compressed: uncompressed, the 2x image alone is several megabytes.
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, h, undefined, "FAST");
     const name = (currentView.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase();
     pdf.save(name + ".pdf");
   }};
@@ -1594,4 +1682,4 @@ def plot_nested(
         title=title,
         show_child_previews=show_child_previews,
     )
-    return HTMLFigure(html)
+    return HTMLFigure(html, height=height)

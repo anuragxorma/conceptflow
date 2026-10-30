@@ -244,7 +244,7 @@ def test_html_pages_escape_names_and_titles():
     outer = FormalContext.from_array([[1], [0], [1]], ["g1", "g2", "g3"], ["x"])
     inner = FormalContext.from_array([[1], [1], [0]], ["g1", "g2", "g3"], ["y"])
     nested = plot_nested(outer, inner=inner, title='say "hi" \\ </script>').html
-    assert nested.count("</script>") == 3
+    assert nested.count("</script>") == 4  # d3, jsPDF, svg2pdf and the page script
     literal = re.search(r"rootData \? (.*?) : currentView.name", nested).group(1)
     assert json.loads(literal) == 'say "hi" \\ </script>'
 

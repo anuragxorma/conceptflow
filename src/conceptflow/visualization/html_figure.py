@@ -4,6 +4,7 @@ Small HTML figure wrapper for custom visualizations.
 
 from __future__ import annotations
 
+import html
 import json
 import os
 import webbrowser
@@ -33,11 +34,25 @@ class HTMLFigure:
     - open(path)
     """
 
-    def __init__(self, html: str):
+    def __init__(self, html: str, height: int | None = None):
         self.html = html
+        # Expected page height in pixels, for the notebook frame before the
+        # page has loaded and measured itself.
+        self.height = height
 
     def _repr_html_(self) -> str:
-        return self.html
+        """
+        The page in its own ``<iframe>``, so that several figures in one
+        notebook do not share ids, scripts or styles with each other or with
+        the notebook. The frame grows to the page's height once loaded.
+        """
+        height = (self.height or 700) + 100
+        return (
+            f'<iframe srcdoc="{html.escape(self.html, quote=True)}" '
+            f'style="width: 100%; height: {height}px; border: none;" '
+            'onload="this.style.height = '
+            "(this.contentDocument.documentElement.scrollHeight + 4) + 'px';\"></iframe>"
+        )
 
     def to_html(self) -> str:
         """
@@ -67,9 +82,11 @@ class HTMLFigure:
         """
         Display the figure in IPython/Jupyter.
         """
-        from IPython.display import HTML, display
+        from IPython.display import display
 
-        display(HTML(self.html))
+        # display(self) uses _repr_html_; IPython's HTML() would warn about
+        # the <iframe>.
+        display(self)
 
     def open(
         self,

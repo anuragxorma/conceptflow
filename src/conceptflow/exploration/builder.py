@@ -67,8 +67,18 @@ class ExplorationBuilder:
             scale_names=tuple(scale.source_attribute for scale in scales),
         )
 
+    @staticmethod
+    def _check_scales(scales) -> None:
+        if isinstance(scales, (str, Scale)) or not all(
+            isinstance(scale, Scale) for scale in scales
+        ):
+            raise TypeError(
+                f"scales must be a list of Scale objects, got {scales!r}."
+            )
+
     def _scale(self, mvc: ManyValuedContext, scales: list[Scale]):
         """Scale ``mvc`` into a formal context with this builder's policy."""
+        self._check_scales(scales)
         scaler = ConceptualScaler(
             scales=scales,
             output="context",
@@ -199,6 +209,11 @@ class ExplorationBuilder:
             backward-compatible signatures; do not rely on it to include or
             exclude anything.
         """
+        self._check_scales(scales)
+        if not isinstance(name_template, str):
+            raise TypeError(
+                f"name_template must be a string, got {name_template!r}."
+            )
         children: list[ExplorationView] = []
 
         parent_object_count = parent.context.n_objects

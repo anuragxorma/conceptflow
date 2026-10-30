@@ -289,8 +289,8 @@ def make_random_context(
     with probability ``density``.
 
     Objects are named ``g0, g1, ...`` and attributes ``m0, m1, ...``.
-    ``random_state`` is an int, a NumPy Generator/RandomState or None, as in
-    scikit-learn.
+    ``random_state`` is an int, None, a NumPy ``RandomState`` (as in
+    scikit-learn) or a NumPy ``Generator`` (``np.random.default_rng``).
     """
     for name, value in (("n_objects", n_objects), ("n_attributes", n_attributes)):
         if isinstance(value, bool) or not isinstance(value, numbers.Integral) or value < 0:
@@ -298,5 +298,9 @@ def make_random_context(
     if isinstance(density, bool) or not isinstance(density, numbers.Real) or not 0 <= density <= 1:
         raise ValueError("density must be a number in [0, 1].")
 
-    rng = check_random_state(random_state)
-    return FormalContext.from_array(rng.random_sample((n_objects, n_attributes)) < density)
+    shape = (n_objects, n_attributes)
+    if isinstance(random_state, np.random.Generator):
+        values = random_state.random(shape)
+    else:
+        values = check_random_state(random_state).random_sample(shape)
+    return FormalContext.from_array(values < density)

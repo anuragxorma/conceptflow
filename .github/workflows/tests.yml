@@ -75,6 +75,48 @@ jobs:
       - name: Build the documentation
         run: mkdocs build --strict
 
+  other-platforms:
+    # File paths, encodings, and the native dependencies (python-sat, z3)
+    # on macOS and Windows. Graphviz and LaTeX are not installed there, so
+    # the rendering tests that need them are skipped.
+    name: ${{ matrix.os }}, Python 3.12
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ConceptFlow
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run the tests
+        run: pytest -q
+
+  browser:
+    # The interactive (D3) pages in headless Firefox: drawing, labels,
+    # clicks, navigation, downloads and notebook embedding.
+    name: Interactive pages in Firefox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ConceptFlow, Playwright and Firefox
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest playwright
+          playwright install --with-deps firefox
+      - name: Run the browser tests
+        env:
+          CONCEPTFLOW_BROWSER_TESTS: required
+        run: pytest -q tests/test_browser.py
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from dataclasses import replace
+from numbers import Integral, Real
 
+from sklearn.utils import check_scalar
+
+from conceptflow.visualization._clearance import keep_edges_off_nodes
 from conceptflow.visualization.graph_data import GraphData
 
 
@@ -105,7 +109,9 @@ def layered_layout(
     3. ``sweeps`` down-and-up passes order every row by the median position
        of its neighbours in the row before; the order with the fewest
        crossings (counted exactly between adjacent rows) is kept;
-    4. nodes are spaced evenly within their row, dummies keeping their slot.
+    4. nodes are spaced evenly within their row, dummies keeping their slot;
+    5. nodes that a straight edge would pass through or brush are moved
+       sideways where there is room (``keep_edges_off_nodes``).
 
     Coordinates follow the GraphData convention used by the renderers
     (screen coordinates: the top concept has the smallest ``y``).
@@ -113,8 +119,12 @@ def layered_layout(
     ``sweeps`` defaults to 12, or 3 above 10,000 concepts, where each sweep
     costs more and the drawing is too dense to read closely anyway.
     """
+    check_scalar(x_spacing, "x_spacing", Real, min_val=0, include_boundaries="neither")
+    if y_spacing is not None:
+        check_scalar(y_spacing, "y_spacing", Real, min_val=0, include_boundaries="neither")
     if sweeps is None:
         sweeps = 12 if len(graph_data.nodes) <= 10_000 else 3
+    check_scalar(sweeps, "sweeps", Integral, min_val=0)
 
     level, upper, lower = _levels(graph_data)
     up = {node_id: list(ns) for node_id, ns in upper.items()}
@@ -192,8 +202,11 @@ def layered_layout(
         for node in graph_data.nodes
     ]
 
-    return GraphData(
-        nodes=nodes,
-        edges=graph_data.edges,
-        metadata={**graph_data.metadata, "layout": "layered"},
+    # Edges spanning several rows are drawn straight and can cross a node.
+    return keep_edges_off_nodes(
+        GraphData(
+            nodes=nodes,
+            edges=graph_data.edges,
+            metadata={**graph_data.metadata, "layout": "layered"},
+        )
     )

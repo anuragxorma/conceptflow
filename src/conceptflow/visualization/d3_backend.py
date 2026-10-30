@@ -5,8 +5,14 @@ D3 backend for ordinary ConceptFlow lattice diagrams.
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 from typing import Any
 
+from conceptflow.visualization._checks import (
+    check_max_label_items,
+    html_page_layout,
+    object_formatter,
+)
 from conceptflow.visualization.graph_data import GraphData, needs_rotation
 from conceptflow.visualization.html_figure import HTMLFigure, script_json
 
@@ -45,18 +51,42 @@ def render_graph_data_html(
     width: int = 900,
     height: int = 700,
     title: str = "Concept lattice",
+    show_attribute_labels: bool = True,
+    show_object_labels: bool = True,
+    max_label_items: int | None = 6,
+    object_label: Callable[[str], str] | None = None,
 ) -> str:
     """
     Render GraphData as a standalone D3 HTML string.
+
+    ``width`` includes the 280 px details panel, which moves below the
+    drawing in pages narrower than 560 px.
+
+    Labels follow reduced labelling, as in the other backends: attributes
+    above the node that introduces them, objects below. The full extent and
+    intent of a concept appear in its tooltip and, on click, in the details
+    panel.
     """
-    data_json = script_json(graph_data_to_d3_data(graph_data))
+    from conceptflow.visualization.static import _join_labels, _reduced_labels
+
+    page = html_page_layout(width, height)
+    check_max_label_items(max_label_items)
+    data = graph_data_to_d3_data(graph_data)
+    attributes_at, objects_at = _reduced_labels(graph_data)
+    format_object = object_formatter(object_label)
+    for node in data["nodes"]:
+        attributes = sorted(attributes_at[node["id"]]) if show_attribute_labels else []
+        objects = sorted(map(format_object, objects_at[node["id"]])) if show_object_labels else []
+        node["attribute_text"] = _join_labels(attributes, max_label_items)
+        node["object_text"] = _join_labels(objects, max_label_items)
+    data_json = script_json(data)
 
     return f"""
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <style>
   body {{
     margin: 0;
@@ -92,12 +122,12 @@ def render_graph_data_html(
 
   .conceptflow-body {{
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: {page['columns']};
     min-height: {height}px;
   }}
 
   .conceptflow-details {{
-    border-left: 1px solid #ddd;
+    {page['panel_border']}: 1px solid #ddd;
     background: #fafafa;
     padding: 12px;
     font-size: 12px;
@@ -140,28 +170,46 @@ def render_graph_data_html(
     opacity: 1;
   }}
 
+  /* --node-scale shrinks the outline with the radius (see render). */
   .node {{
     fill: white;
     stroke: black;
-    stroke-width: 1.6;
+    stroke-width: calc(1.6px * var(--node-scale, 1));
     cursor: pointer;
   }}
 
   .node:hover {{
     stroke: #d97706;
-    stroke-width: 3;
+    stroke-width: calc(3px * var(--node-scale, 1));
   }}
 
   .node.selected {{
     stroke: #d97706;
-    stroke-width: 3.5;
+    stroke-width: calc(3.5px * var(--node-scale, 1));
   }}
 
-  .node-label {{
-    font-size: 10px;
+  /* Reduced labels: attributes above the node, objects below. They shrink
+     with the nodes (--node-scale) and grow back when zooming in. */
+  .attr-label, .obj-label {{
+    font-size: calc(10px * var(--node-scale, 1));
     text-anchor: middle;
-    dominant-baseline: middle;
     pointer-events: none;
+    paint-order: stroke;
+    stroke: white;
+    stroke-width: calc(3px * var(--node-scale, 1));
+    stroke-linejoin: round;
+  }}
+
+  .attr-label {{
+    dominant-baseline: auto;
+    fill: #1a1a2e;
+    font-weight: 600;
+  }}
+
+  .obj-label {{
+    dominant-baseline: hanging;
+    fill: #444;
+    font-style: italic;
   }}
 </style>
 </head>
@@ -173,7 +221,7 @@ def render_graph_data_html(
   </div>
 
   <div class="conceptflow-body">
-    <svg id="conceptflow-svg" width="{width - 280}" height="{height}"></svg>
+    <svg id="conceptflow-svg" width="{page['drawing_width']}" height="{height}"></svg>
 
     <div id="conceptflow-details" class="conceptflow-details">
       <div class="details-title">Details</div>
@@ -184,7 +232,7 @@ def render_graph_data_html(
 
 <script>
 const graphData = {data_json};
-const svgWidth = {width - 280};
+const svgWidth = {page['drawing_width']};
 const svgHeight = {height};
 
 const svg = d3.select("#conceptflow-svg");
@@ -253,6 +301,17 @@ function showDetails(d) {{
       <div>x=${{Number(d.x ?? 0).toFixed(2)}}, y=${{Number(d.y ?? 0).toFixed(2)}}</div>
     </div>
   `);
+}}
+
+function closestDistance(nodes) {{
+  const points = nodes.map(d => [d.screenX, d.screenY]).sort((a, b) => a[0] - b[0]);
+  let best = Infinity;
+  for (let i = 0; i < points.length; i++) {{
+    for (let j = i + 1; j < points.length && points[j][0] - points[i][0] < best; j++) {{
+      best = Math.min(best, Math.hypot(points[j][0] - points[i][0], points[j][1] - points[i][1]));
+    }}
+  }}
+  return best;
 }}
 
 function computeTransform(nodes, targetWidth, targetHeight, padding, rotate) {{
@@ -328,7 +387,8 @@ function render() {{
   rootLayer.selectAll("*").remove();
 
   const transform = computeTransform(
-    graphData.nodes, svgWidth, svgHeight, 80, graphData.rotate !== false
+    graphData.nodes, svgWidth, svgHeight, Math.min(80, svgWidth / 6, svgHeight / 6),
+    graphData.rotate !== false
   );
   const nodeById = new Map(graphData.nodes.map(d => [d.id, d]));
 
@@ -337,6 +397,11 @@ function render() {{
     d.screenX = p.x;
     d.screenY = p.y;
   }});
+  // Up to 18 px, but neighbouring circles never overlap; zooming in can
+  // always bring small nodes up to full size.
+  const radius = Math.min(18, 0.4 * closestDistance(graphData.nodes));
+  svg.style("--node-scale", radius / 18);
+  zoom.scaleExtent([0.3, Math.max(8, 18 / radius)]);
 
   const edgeSelection = rootLayer
     .append("g")
@@ -360,7 +425,7 @@ function render() {{
   const circles = nodeGroup
     .append("circle")
     .attr("class", "node")
-    .attr("r", 18)
+    .attr("r", radius)
     .on("mouseover", function(event, d) {{
       d3.select(this).classed("selected", true);
 
@@ -382,10 +447,18 @@ function render() {{
     .text(d => d.hover);
 
   nodeGroup
+    .filter(d => d.attribute_text)
     .append("text")
-    .attr("class", "node-label")
-    .attr("y", 30)
-    .text(d => labelForNode(d));
+    .attr("class", "attr-label")
+    .attr("y", -radius * 1.3)
+    .text(d => d.attribute_text);
+
+  nodeGroup
+    .filter(d => d.object_text)
+    .append("text")
+    .attr("class", "obj-label")
+    .attr("y", radius * 1.3)
+    .text(d => d.object_text);
 }}
 
 render();
@@ -400,11 +473,14 @@ def render_with_d3(
     width: int = 900,
     height: int = 700,
     title: str = "Concept lattice",
+    **label_options,
 ) -> HTMLFigure:
     """
     Render GraphData with the built-in D3 backend.
 
     Nodes without coordinates get the layered layout first.
+    ``label_options`` (``show_attribute_labels``, ``show_object_labels``,
+    ``max_label_items``, ``object_label``) go to ``render_graph_data_html``.
     """
     if any(node.x is None or node.y is None for node in graph_data.nodes):
         from conceptflow.visualization.layered_layout import layered_layout
@@ -417,5 +493,7 @@ def render_with_d3(
             width=width,
             height=height,
             title=title,
-        )
+            **label_options,
+        ),
+        height=height,
     )

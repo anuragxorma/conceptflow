@@ -119,24 +119,34 @@ incompatibilities.
 Finding the largest bipartite subgraph is NP-hard; `method` chooses how,
 following Dürrschnabel, Hanika & Stumme (2022):
 
-- `"exact"` (default): the fewest crosses to drop, from a SAT formulation
-  solved with MiniSat 2.2 — exponential in the worst case, meant for the
-  small contexts ordinal factorization is usually applied to;
-- `"greedy"`: a fast heuristic (every dropped cross conflicts with both
-  sides of the bipartition it built);
-- `"annealing"`: the greedy result improved by simulated annealing
-  (`n_iterations`, `temperature`).
+- `"annealing"` (default): a greedy result improved by simulated annealing
+  (`n_iterations`, `temperature`); seconds even for hundreds of crosses,
+  and on small contexts as good as `"exact"` in our tests. The defaults are
+  smaller than the paper's recommendation (temperature 50, quadratic
+  cooling, 10000 iterations) and give the same results about ten times
+  faster;
+- `"exact"`: the fewest crosses to drop, from a SAT formulation solved with
+  MiniSat 2.2. It is exponential: about 20 seconds for a 15 × 15 context of
+  density 0.4, hours a little beyond, so `fit` stops with `TimeoutError`
+  after `max_time` seconds (default 60; `None` for no limit);
+- `"greedy"`: a fast heuristic. It drops no cross it could keep
+  (inclusion-minimal), but often many more than necessary.
+
+The paper's greedy and annealing algorithms do not by themselves guarantee
+the inclusion-minimal result the paper states (in about a fifth of small
+random cases a dropped cross could be kept), so ConceptFlow ends both with a
+pass that puts back every cross it can.
 
 ```python
 from conceptflow.datasets import load_context
 from conceptflow.decomposition import Ord2Factor
 
 triangles = load_context("triangles_en")
-exact = Ord2Factor().fit(triangles)
-greedy = Ord2Factor(method="greedy", random_state=0).fit(triangles)
+model = Ord2Factor(random_state=0).fit(triangles)  # annealing
+exact = Ord2Factor(method="exact").fit(triangles)
 
+print(round(model.coverage_, 2), len(model.removed_incidence_))  # 0.87 3
 print(round(exact.coverage_, 2), len(exact.removed_incidence_))  # 0.87 3
-print(round(greedy.coverage_, 2), len(greedy.removed_incidence_))  # 0.57 10
 ```
 
 `factors_` are the two Ferrers relations, `removed_incidence_` the crosses

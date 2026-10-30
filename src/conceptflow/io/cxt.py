@@ -120,7 +120,8 @@ def read_cxt(path: str | Path) -> FormalContext:
 
 def write_cxt(context: FormalContext, path: str | Path) -> None:
     """
-    Write a FormalContext to a Burmeister .cxt file.
+    Write a FormalContext to a Burmeister .cxt file (missing folders are
+    created).
     """
     path = Path(path)
 
@@ -146,4 +147,5 @@ def write_cxt(context: FormalContext, path: str | Path) -> None:
     for row in context.incidence:
         lines.append("".join("X" if value else "." for value in row))
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

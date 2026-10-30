@@ -112,7 +112,7 @@ def test_fcart_json_is_validated(text, message):
 
 def test_csv_rows_longer_than_the_header(tmp_path):
     path = tmp_path / "ctx.csv"
-    path.write_text(",a\no1,1,1\n")
+    path.write_text(",a\no1,1,1\n", encoding="utf-8")
     with pytest.raises(ValueError, match="2 values"):
         read_csv(path)
 

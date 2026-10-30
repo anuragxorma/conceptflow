@@ -36,7 +36,7 @@ from conceptflow import ExplorationBuilder, FormalContext, ManyValuedContext
 from conceptflow.exploration import realized_pairs
 from conceptflow.preprocessing import DichotomicScale, GeneralScale, ThresholdScale
 from conceptflow.rules import ImplicationBasisEstimator
-from conceptflow.visualization import debug_bottom_outer, plot_nested
+from conceptflow.visualization import plot_nested
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 
 # Next to this script, so the example runs from any folder.
@@ -558,8 +558,6 @@ def main() -> None:
         include_top=True,
         include_bottom=True,
     )
-
-    debug_bottom_outer(root)
 
     basis = compute_implication_basis(root)
     print_implication_report(basis)

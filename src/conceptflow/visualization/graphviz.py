@@ -15,6 +15,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from conceptflow.core import ConceptLattice
+from conceptflow.visualization._checks import check_max_label_items, object_formatter
+from conceptflow.visualization._text import display_text
 from conceptflow.visualization.graph_data import reduced_labels
 
 _ATTRIBUTE_COLOR = "#1f4e79"
@@ -34,6 +36,7 @@ def _html_escape(text: str) -> str:
 
 
 def _join(items: list[str], max_items: int | None) -> str:
+    items = [display_text(item) for item in items]
     if max_items is not None and len(items) > max_items:
         items = [*items[:max_items], f"+{len(items) - max_items}"]
     return ", ".join(items)
@@ -53,8 +56,9 @@ def lattice_to_dot(
     The top concept is drawn at the top. Graphviz computes the layout, so
     this works for lattices far too large for DimFlux.
     """
+    check_max_label_items(max_label_items)
     attributes_at, objects_at = reduced_labels(lattice)
-    format_object = object_label or (lambda name: name)
+    format_object = object_formatter(object_label)
     node_id = {concept: f"c{i}" for i, concept in enumerate(lattice.concepts)}
 
     lines = [

@@ -15,6 +15,8 @@ import math
 from collections.abc import Callable
 from typing import Any
 
+from conceptflow.visualization._checks import check_max_label_items, object_formatter
+from conceptflow.visualization._text import display_text
 from conceptflow.visualization.graph_data import GraphData
 
 _LINE_COLOR = "#555555"
@@ -67,6 +69,7 @@ def _math_coordinates(x: float, y: float) -> tuple[float, float]:
 
 
 def _join_labels(items: list[str], max_items: int | None) -> str:
+    items = [display_text(item) for item in items]
     if max_items is not None and len(items) > max_items:
         hidden = f"+{len(items) - max_items}"
         return ", ".join([*items[:max_items], hidden])
@@ -102,9 +105,13 @@ def _reduced_labels(graph_data: GraphData) -> tuple[dict[str, list[str]], dict[s
     intent; object g at γ(g), the smallest concept with g in its extent.
 
     A label is placed only where that concept is drawn: on an iceberg
-    lattice γ(g) may lie below the iceberg (g then belongs to several
-    minimal drawn concepts), and the label is left out, as in the Graphviz
-    export.
+    lattice γ(g) may lie below the iceberg, and the label is left out, as in
+    the Graphviz export.
+
+    ``lattice_to_graph_data`` stores the labels with the nodes. Without them
+    (a GraphData built by hand), they are derived from the drawn extents and
+    intents, which identifies γ(g) only in a full lattice: object labels are
+    then left out if the graph's metadata marks it as an iceberg lattice.
     """
     if all("object_labels" in node.metadata for node in graph_data.nodes):
         # Computed from the lattice by lattice_to_graph_data.
@@ -126,7 +133,10 @@ def _reduced_labels(graph_data: GraphData) -> tuple[dict[str, list[str]], dict[s
         for name in intent:
             having.setdefault(name, []).append((intent, node.node_id))
 
-    for name, nodes in containing.items():
+    # In an iceberg lattice the smallest drawn concept containing g need not
+    # be γ(g), and the context needed to tell is not part of the GraphData.
+    iceberg = bool(graph_data.metadata.get("is_iceberg"))
+    for name, nodes in ({} if iceberg else containing).items():
         smallest, node_id = min(nodes, key=lambda item: len(item[0]))
         if all(smallest <= extent for extent, _ in nodes):
             objects_at[node_id].append(name)
@@ -189,6 +199,7 @@ def render_lattice_matplotlib(
     """
     from matplotlib.collections import LineCollection
 
+    check_max_label_items(max_label_items)
     fig, ax = _new_axes(ax, figsize)
 
     graph_data, positions = _lattice_positions(graph_data)
@@ -205,7 +216,7 @@ def render_lattice_matplotlib(
     )
 
     attributes_at, objects_at = _reduced_labels(graph_data)
-    format_object = object_label or (lambda name: name)
+    format_object = object_formatter(object_label)
     offset = math.sqrt(node_size) / 2 + 2
 
     for node in graph_data.nodes:
@@ -342,6 +353,8 @@ def render_nested_matplotlib(
     """
     from matplotlib.collections import LineCollection
     from matplotlib.patches import Circle
+
+    check_max_label_items(max_label_items)
 
     fig, ax = _new_axes(ax, figsize)
 

@@ -20,7 +20,7 @@ keywords = [
     "conceptual-scaling",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
@@ -78,6 +78,9 @@ version = { attr = "conceptflow._version.__version__" }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# scikit-mine (dim-flux -> fcapy -> scikit-mine) still imports numpy.core.
+filterwarnings = ["ignore:numpy.core:DeprecationWarning:skmine"]
+markers = ["browser: interactive pages in headless Firefox (needs Playwright)"]
 
 [tool.ruff]
 line-length = 100

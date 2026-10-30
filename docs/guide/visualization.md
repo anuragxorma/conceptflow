@@ -42,6 +42,10 @@ print(tikz.source.splitlines()[0])  # \begin{tikzpicture}[
 | `"layered"` | Sugiyama-style rows with crossing reduction | large lattices: tens of thousands of concepts in seconds |
 | `"none"` | no coordinates | renderers that need them fall back to `"layered"` |
 
+Both layouts move a concept slightly sideways when a straight edge would
+pass through it, so the drawing never suggests a cover relation that does
+not exist; heights are kept, so every edge still points upward.
+
 DimFlux takes seconds for small lattices but can take minutes beyond a few
 hundred concepts; ConceptFlow warns above 150 concepts. `timeout_ms`
 (default 1000) limits each of its optimization phases loosely, not the total
@@ -81,6 +85,16 @@ Graphviz computes its own layout. It produces good drawings but becomes slow
 for thousands of concepts; `layout="layered"` with matplotlib or TikZ is much
 faster there.
 
+## Interactive (d3) options
+
+The interactive page shows the same reduced labels; a concept's full extent
+and intent appear in its tooltip and, on click, in the details panel. Large
+lattices are drawn with smaller nodes so none overlap; zoom in with the
+mouse wheel to bring them back to full size. `show_attribute_labels=`,
+`show_object_labels=`, `max_label_items=` and `object_label=` work as for
+matplotlib below. `width` includes the 280 px details panel, which moves
+below the drawing in pages narrower than 560 px.
+
 ## matplotlib options
 
 `render_lattice_matplotlib` options can be passed to `plot_lattice`:
@@ -101,3 +115,29 @@ fig.savefig("side_by_side.png")
 
 Nested line diagrams have the same backends; see
 [Nested line diagrams](nested.md).
+
+## Known limitations
+
+- **Crowded layouts.** No edge is drawn through a concept it does not
+  connect, but in crowded rows of the layered layout an edge can pass close
+  to one: a concept is only moved where it keeps its distance to all others.
+  Lattices above 2000 concepts are not adjusted at all.
+- **Very large lattices in the interactive page.** Nodes shrink so that none
+  overlap; on a few hundred concepts they are tiny until you zoom in.
+- **Labels can overlap** in dense diagrams, in every backend. `max_label_items=`,
+  `object_label=` and hiding one kind of label (`show_object_labels=False`)
+  help; a larger `width`/`height` (or `figsize`) spreads the drawing.
+- **The interactive pages need internet access**: they load D3 (and, for the
+  nested PDF export, jsPDF and svg2pdf.js) from public CDNs, in exact
+  versions.
+- **Notebooks.** Each interactive figure is shown in its own frame. In a
+  notebook run by someone else, Jupyter does not run its HTML until you trust
+  the notebook (*File → Trust Notebook*) or rerun the cells, so the frames
+  stay empty until then. A matplotlib figure returned as the last line of a
+  cell is shown twice, as for any matplotlib figure; end the line with `;`.
+- **LaTeX in names** is shown for common commands only (`\sqrt{3}` → √3,
+  Greek letters, `\leq`, `x^2`, ...); anything else stays as written. TikZ
+  typesets it in math mode.
+- **Nested PDF export** is vector for names in Latin-1; other names (for
+  example with √ or α) give an image PDF, since jsPDF's standard fonts cannot
+  show them.

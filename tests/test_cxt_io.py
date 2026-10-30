@@ -96,3 +96,27 @@ def test_read_cxt_accepts_lowercase_x(tmp_path):
         [True, False],
         [False, True],
     ]
+
+
+def test_writers_create_missing_folders(tmp_path):
+    # Like the TikZ, Graphviz and HTML figure writers.
+    from conceptflow.io import read_csv, read_json, write_csv, write_json
+
+    context = FormalContext.from_array([[1, 0], [0, 1]], objects=["g", "h"], attributes=["m", "n"])
+    for write, read, suffix in (
+        (write_cxt, read_cxt, "cxt"), (write_json, read_json, "json"), (write_csv, read_csv, "csv")
+    ):
+        path = tmp_path / "new" / suffix / f"context.{suffix}"
+        write(context, path)
+        assert read(path) == context
+
+
+def test_read_csv_pads_short_rows_and_rejects_long_ones(tmp_path):
+    from conceptflow.io import read_csv
+
+    path = tmp_path / "short.csv"
+    path.write_text(",m,n\na,1\n", encoding="utf-8")
+    assert read_csv(path).incidence.tolist() == [[True, False]]
+    path.write_text(",m\na,1,1\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Line 2 has 2 values"):
+        read_csv(path)

@@ -34,7 +34,18 @@ ruff check src tests examples benchmarks
 mkdocs build --strict     # the documentation
 ```
 
-The same checks run automatically on every push and pull request.
+Changes to the interactive (D3) pages should also pass the browser tests,
+which open the pages in headless Firefox. They are skipped unless
+Playwright is installed, and need internet access for the D3 and jsPDF
+scripts:
+
+```bash
+pip install playwright && playwright install firefox
+pytest tests/test_browser.py
+```
+
+The same checks, browser tests included, run automatically on every push and
+pull request.
 
 ## Guidelines
 

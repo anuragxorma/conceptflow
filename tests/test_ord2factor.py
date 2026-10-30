@@ -81,6 +81,20 @@ def test_heuristic_deletions_make_the_graph_bipartite(seed, method):
     assert len(deleted) >= len(minimum_bipartite_deletion(graph))
 
 
+@pytest.mark.parametrize("method", ["greedy", "annealing"])
+@pytest.mark.parametrize("seed", range(40))
+def test_heuristic_deletions_are_inclusion_minimal(seed, method):
+    # The paper's algorithms alone are not (about a fifth of these graphs);
+    # the final pass makes every deleted vertex necessary.
+    graph = _random_graph(seed, max_vertices=14)
+    if method == "greedy":
+        deleted = greedy_bipartite_deletion(graph, random_state=seed)
+    else:
+        deleted = annealing_bipartite_deletion(graph, n_iterations=200, random_state=seed)
+
+    assert not any(is_bipartite(graph, frozenset(deleted - {v})) for v in deleted)
+
+
 @pytest.mark.parametrize("seed", range(40))
 def test_greedy_fill_leaves_only_vertices_conflicting_with_both_sides(seed):
     graph = _random_graph(seed, max_vertices=14)
@@ -166,3 +180,30 @@ def test_invalid_parameters():
         Ord2Factor(method="genetic").fit(np.eye(3))
     with pytest.raises(ValueError, match="n_iterations"):
         Ord2Factor(method="annealing", n_iterations=-1).fit(np.eye(3))
+
+
+def test_default_method_is_fast_on_contexts_exact_cannot_handle():
+    X = (np.random.default_rng(0).random((20, 20)) < 0.4).astype(int)
+    model = Ord2Factor(random_state=0).fit(X)  # annealing
+    assert model.method == "annealing" and 0 < model.coverage_ < 1
+
+
+def test_exact_method_stops_at_max_time():
+    import time
+
+    X = (np.random.default_rng(0).random((20, 20)) < 0.4).astype(int)
+    start = time.monotonic()
+    with pytest.raises(TimeoutError, match='method="annealing"'):
+        Ord2Factor(method="exact", max_time=0.5).fit(X)
+    assert time.monotonic() - start < 10
+
+
+@pytest.mark.parametrize("max_time, error", [(0, ValueError), (-1, ValueError), ("5", TypeError)])
+def test_max_time_is_validated(max_time, error):
+    with pytest.raises(error, match="max_time"):
+        Ord2Factor(method="exact", max_time=max_time).fit(np.eye(3))
+
+
+def test_minimum_deletion_time_limit():
+    graph = _random_graph(1)
+    assert minimum_bipartite_deletion(graph, max_time=60) == minimum_bipartite_deletion(graph)
