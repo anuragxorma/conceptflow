@@ -38,7 +38,8 @@ for implication in compute_canonical_basis(ctx):
 # ('a', 'c') -> ('b',)
 # ('b', 'c') -> ('a',)
 
-cf.plot_lattice(lattice, backend="tikz", layout="layered").write("lattice.pdf")
+fig = cf.plot_lattice(lattice, backend="matplotlib", layout="layered")
+fig.savefig("lattice.png")  # backend="tikz" gives LaTeX code instead
 ```
 
 ## Features
@@ -53,14 +54,18 @@ cf.plot_lattice(lattice, backend="tikz", layout="layered").write("lattice.pdf")
   LinCbO, proper-premise basis, near-implications with exceptions (Luxenburger
   basis), minimal generators.
 - **Measures:** stability (exact and bounds), Δ-measure, entropy, information
-  gain, linearity and distributivity indices.
+  gain; lattice width, height, incomparable pairs, linearity and
+  distributivity indices.
+- **Scale-measures:** coarser views of a context from attribute projections
+  and conjunctions, their verification, and refinement pairs.
 - **Conceptual scaling** of many-valued data with seven scale types and
   explicit missing-value handling.
 - **scikit-learn:** scaling, concept and implication features, and an
   outlier detector that explains its decisions with implications.
 - **Visualization:** interactive HTML, DimFlux and layered layouts,
   matplotlib, Graphviz and TikZ/LaTeX export; Toscana-style nested line
-  diagrams.
+  diagrams; 14 drawing quality metrics (crossings, layering, slopes,
+  clearance).
 - **Data quality:** rule violations, redundant objects and attributes,
   explanations of objects and rules.
 - **Factorization:** Boolean matrix factorization (GreConD, ASSO) as

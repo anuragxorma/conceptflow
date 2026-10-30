@@ -30,7 +30,7 @@ Before proposing a change, run:
 
 ```bash
 pytest                    # the test suite, including scikit-learn's estimator checks
-ruff check src tests examples benchmarks
+ruff check src tests examples benchmarks .github/scripts
 mkdocs build --strict     # the documentation
 ```
 

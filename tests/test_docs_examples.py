@@ -1,5 +1,6 @@
 """
-Run the code examples of the documentation, so the docs cannot go stale.
+Run the code examples of the documentation and the README, so they cannot
+go stale.
 
 Every ```python block of a page runs in order, in one shared namespace, in a
 temporary directory where the repository's ``data/`` folder is available.
@@ -27,10 +28,13 @@ matplotlib.use("Agg")
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-PAGES = sorted(
-    [DOCS / "index.md", DOCS / "getting-started.md", *sorted((DOCS / "guide").glob("*.md"))],
-    key=str,
-)
+PAGES = [
+    ROOT / "README.md",
+    *sorted(
+        [DOCS / "index.md", DOCS / "getting-started.md", *(DOCS / "guide").glob("*.md")],
+        key=str,
+    ),
+]
 BLOCK = re.compile(r"(<!-- no-test -->\s*)?```python\n(.*?)```", re.S)
 INLINE_RESULT = re.compile(r"^(\s*)print\((.*)\)\s+#\s+(.+)$")
 
@@ -55,7 +59,7 @@ def checked(code: str) -> str:
     return "\n".join(lines)
 
 
-@pytest.mark.parametrize("page", PAGES, ids=lambda p: str(p.relative_to(DOCS)))
+@pytest.mark.parametrize("page", PAGES, ids=lambda p: str(p.relative_to(ROOT)))
 def test_page_examples_run(page, tmp_path, monkeypatch):
     blocks = python_blocks(page)
     if not blocks:
@@ -72,7 +76,7 @@ def test_page_examples_run(page, tmp_path, monkeypatch):
                 exec(compile(checked(code), f"{page.name}[block {number}]", "exec"), namespace)
         except Exception as exc:  # pragma: no cover - reported to the user
             raise AssertionError(
-                f"{page.relative_to(DOCS)}, block {number} failed: {exc!r}\n\n{code}"
+                f"{page.relative_to(ROOT)}, block {number} failed: {exc!r}\n\n{code}"
             ) from exc
 
     os.chdir(ROOT)

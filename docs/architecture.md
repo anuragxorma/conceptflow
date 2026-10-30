@@ -23,8 +23,9 @@ Each subpackage has one job; the arrows of dependence point towards `core/`.
 The mathematical foundation: `FormalContext`, `Concept`, `ConceptLattice`
 (with navigation: parents, children, join, meet, up- and down-sets),
 `ManyValuedContext`, `IncompleteContext` (three-valued contexts with
-certain/possible answers) and the context operations (`apposition`,
-`subposition`, `direct_sum`, `direct_product`, `complement`, `dual`).
+certain/possible answers), the context operations (`apposition`,
+`subposition`, `direct_sum`, `direct_product`, `complement`, `dual`) and
+scale-measures (`scale_measure`, `is_scale_measure`, `refines`).
 Independent of visualization, machine learning and rendering.
 
 ## `algorithms/`
@@ -41,7 +42,9 @@ contexts.
 Measures of concepts and rules: support, confidence and exceptions of
 implications; exact stability, its bounds and the Δ-measure; entropy and
 information gain with respect to labels; linearity and distributivity
-indices.
+indices, lattice width and height, incomparable pairs and concept levels;
+and the quality metrics of line diagrams (`drawing_quality.py`), which take
+a laid-out `GraphData` or a networkx graph.
 
 ## `preprocessing/`
 

@@ -11,6 +11,12 @@ from conceptflow.core.operations import (
     dual,
     subposition,
 )
+from conceptflow.core.scale_measures import (
+    is_scale_measure,
+    refines,
+    scale_measure,
+    scale_measure_problems,
+)
 
 __all__ = [
     "Concept",
@@ -24,4 +30,8 @@ __all__ = [
     "direct_product",
     "complement",
     "dual",
+    "scale_measure",
+    "is_scale_measure",
+    "scale_measure_problems",
+    "refines",
 ]

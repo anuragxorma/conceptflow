@@ -394,3 +394,71 @@ def test_ordinal_and_interordinal_scales_match_their_relations(seed):
     for k in levels:
         assert scaled[f"v<={k}"].tolist() == [v <= k for v in values]
         assert scaled[f"v>={k}"].tolist() == [v >= k for v in values]
+
+
+# ---------------------------------------------------------------------------
+# Order indices and scale-measures, from their definitions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_order_indices_match_their_definitions(seed):
+    from conceptflow.metrics import (
+        concept_levels,
+        incomparable_pairs,
+        lattice_height,
+        lattice_width,
+    )
+
+    ref = Ref(random_incidence(seed, max_objects=6, max_attributes=5))
+    lattice = ConceptLattice.from_context(context_of(ref.I))
+    extents = [c.extent for c in lattice.concepts]
+    comparable = {(i, j) for i, a in enumerate(extents) for j, b in enumerate(extents)
+                  if i != j and (a <= b or b <= a)}
+    pairs = len(extents) * (len(extents) - 1) // 2
+    assert incomparable_pairs(lattice) == pairs - len(comparable) // 2
+
+    # Width: the largest set of pairwise incomparable concepts, by trying sets
+    # from the largest size down.
+    def antichain(indices):
+        return all((i, j) not in comparable for i, j in itertools.combinations(indices, 2))
+
+    width = next(k for k in range(len(extents), 0, -1)
+                 if any(antichain(s) for s in itertools.combinations(range(len(extents)), k)))
+    assert lattice_width(lattice) == width
+
+    # Levels: the most concepts on a chain ending in each concept.
+    def longest_chain_to(i):
+        return 1 + max((longest_chain_to(j) for j in range(len(extents))
+                        if extents[j] < extents[i]), default=0)
+
+    levels = [longest_chain_to(i) for i in range(len(extents))]
+    assert concept_levels(lattice).tolist() == levels
+    assert lattice_height(lattice) == max(levels)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_scale_measures_match_the_definition(seed):
+    from conceptflow.core import is_scale_measure, refines, scale_measure
+
+    ref = Ref(random_incidence(seed))
+    context = context_of(ref.I)
+    extents = {a for a, _ in ref.concepts()}
+    rng = np.random.default_rng(seed)
+
+    # Projections and conjunctions: every extent of the scale is one of the
+    # context's, so the scale refines into the context.
+    entries = [tuple(rng.choice(ref.m, size=int(rng.integers(1, min(3, ref.m) + 1)),
+                                replace=False).tolist()) for _ in range(3)]
+    entries = list(dict.fromkeys(tuple(sorted(e)) for e in entries))
+    scale = scale_measure(context, entries)
+    scale_extents = {a for a, _ in Ref(np.asarray(scale.incidence)).concepts()}
+    assert scale_extents <= extents
+    assert is_scale_measure(context, scale) and refines(scale, context)
+
+    # An arbitrary column is a scale-measure iff its extent is an extent.
+    column = rng.random(ref.g) < 0.5
+    other = FormalContext(objects=context.objects, attributes=("x",), incidence=column[:, None])
+    assert is_scale_measure(context, other) == (
+        frozenset(np.flatnonzero(column).tolist()) in extents
+    )

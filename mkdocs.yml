@@ -70,9 +70,11 @@ nav:
       - Concept lattices: guide/lattices.md
       - Implications and rules: guide/rules.md
       - Concept measures: guide/measures.md
+      - Scale-measures and order indices: guide/scale-measures.md
       - Conceptual scaling and missing values: guide/scaling.md
       - scikit-learn: guide/sklearn.md
       - Visualization: guide/visualization.md
+      - Drawing quality: guide/drawing-quality.md
       - Nested line diagrams: guide/nested.md
       - Data quality: guide/quality.md
       - Factorization: guide/decomposition.md

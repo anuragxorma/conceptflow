@@ -7,13 +7,16 @@ of ``lattice.concepts``:
 - ``concept_stability``: exact (intensional) stability,
 - ``stability_bounds``: cheap lower and upper bounds for stability,
 - ``delta_measure``: the Δ-measure (difference to the largest subconcept),
-- ``concept_entropy`` / ``concept_information_gain``: label-aware measures.
+- ``concept_entropy`` / ``concept_information_gain``: label-aware measures,
+- ``concept_levels``: the length of the longest chain below each concept.
 
 Lattice indices return one number:
 
 - ``linearity_index``: share of comparable pairs of concepts,
 - ``distributivity_index``: share of pairs of intents whose union is an
-  intent.
+  intent,
+- ``lattice_width``, ``lattice_height``, ``incomparable_pairs``: the largest
+  antichain, the longest chain and the number of incomparable pairs.
 """
 
 from __future__ import annotations
@@ -336,3 +339,78 @@ def distributivity_index(lattice: ConceptLattice) -> float:
 
     qualifying = _comparable_pairs(lattice) + incomparable_distributive
     return qualifying / (n * (n - 1) / 2)
+
+
+def concept_levels(lattice: ConceptLattice) -> np.ndarray:
+    """
+    The level of every concept: the number of concepts in a longest chain
+    from a minimal concept up to it (minimal concepts have level 1).
+
+    In a full lattice the bottom concept is the only one at level 1, and the
+    top concept's level is ``lattice_height``. Concepts on one level are
+    pairwise incomparable, so a drawing may arrange each level freely from
+    left to right. On an iceberg lattice the levels are those of the drawn
+    concepts among themselves.
+    """
+    position = {concept: i for i, concept in enumerate(lattice.concepts)}
+    levels = np.zeros(lattice.n_concepts, dtype=int)
+    # Lower neighbours have smaller extents, so they get their level first.
+    for i in sorted(range(lattice.n_concepts), key=lambda k: len(lattice.concepts[k].extent)):
+        below = [levels[position[child]] for child in lattice.children(lattice.concepts[i])]
+        levels[i] = max(below, default=0) + 1
+    return levels
+
+
+def lattice_height(lattice: ConceptLattice) -> int:
+    """
+    The number of concepts in a longest chain: the largest ``concept_levels``.
+
+    A chain of k concepts has height k; a lattice with one concept has
+    height 1.
+    """
+    return int(concept_levels(lattice).max())
+
+
+def incomparable_pairs(lattice: ConceptLattice) -> int:
+    """
+    The number of unordered pairs of concepts neither of which lies below
+    the other.
+
+    It is what a two-dimensional drawing has to decide (which of the two
+    goes left), and it grows much faster than the number of concepts in wide
+    lattices; ``linearity_index`` is the share of the other pairs.
+    """
+    n = lattice.n_concepts
+    return n * (n - 1) // 2 - _comparable_pairs(lattice)
+
+
+def lattice_width(lattice: ConceptLattice) -> int:
+    """
+    The size of a largest antichain: the most concepts that are pairwise
+    incomparable.
+
+    By Dilworth's theorem this is the number of concepts minus a maximum
+    matching between "is strictly below" pairs (all comparable pairs, not
+    only covers), found with SciPy's Hopcroft-Karp implementation. Quadratic
+    in the number of concepts in time and memory.
+    """
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import maximum_bipartite_matching
+
+    _warn_if_large(lattice, "lattice_width", "incomparable_pairs() is cheaper.")
+    n = lattice.n_concepts
+    if n < 2:
+        return n
+    extents = _membership_matrix([c.extent for c in lattice.concepts], lattice.context.n_objects)
+    sizes = extents.sum(axis=1)
+    rows, columns = [], []
+    for chunk, common in _pairwise_counts(extents, extents):
+        # i strictly below j: A_i is contained in A_j and smaller (extents differ).
+        below = (common == sizes[chunk][:, None]) & (sizes[chunk][:, None] < sizes[None, :])
+        r, c = np.nonzero(below)
+        rows.append(r + chunk.start)
+        columns.append(c)
+    rows, columns = np.concatenate(rows), np.concatenate(columns)
+    graph = csr_matrix((np.ones(len(rows), dtype=np.int8), (rows, columns)), shape=(n, n))
+    matching = maximum_bipartite_matching(graph, perm_type="column")
+    return n - int((matching >= 0).sum())

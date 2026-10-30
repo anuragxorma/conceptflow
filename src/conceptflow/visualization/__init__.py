@@ -10,6 +10,7 @@ from conceptflow.visualization.graph_data import (
     GraphEdge,
     GraphNode,
     lattice_to_graph_data,
+    layout_positions,
 )
 from conceptflow.visualization.graphviz import GraphvizFigure, lattice_to_dot
 from conceptflow.visualization.html_figure import HTMLFigure
@@ -38,6 +39,7 @@ __all__ = [
     "GraphEdge",
     "GraphData",
     "lattice_to_graph_data",
+    "layout_positions",
     "lattice_to_graph_data_dimflux",
     "HTMLFigure",
     "GraphvizFigure",

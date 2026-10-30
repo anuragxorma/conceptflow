@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.6.0 (2026-10-30)
+
+New: scale-measures (coarser views of a context, with verification and
+refinement pairs), order indices of lattices, and 14 quality metrics for
+line diagrams. CI now also tests the built packages and Python 3.13. No
+existing behaviour changes, except that the README's first example saves a
+matplotlib figure instead of compiling TikZ.
+
+### Added
+
+- **Scale-measures** (Hanika & Hirth, 2022) in `conceptflow.core`:
+  `scale_measure(context, attributes)` builds a coarser view on the same
+  objects from attribute projections and conjunctions, in a canonical
+  attribute order; `is_scale_measure` and `scale_measure_problems` check the
+  property attribute by attribute; `refines(coarse, fine)` tells whether every
+  extent of one view is an extent of the other (a refinement pair).
+- **Order indices** in `conceptflow.metrics`: `lattice_width` (largest
+  antichain), `lattice_height` (longest chain), `incomparable_pairs`, and
+  `concept_levels` (the longest chain below each concept).
+- `conceptflow.visualization.layout_positions(graph_data)`: where each concept
+  is drawn, as `{extent: (x, y)}` keyed by object names, in the upright
+  coordinates of the figures, so drawings of a refinement pair can be
+  compared concept by concept.
+- A guide page, *Scale-measures and order indices*.
+- **Drawing quality metrics** in `conceptflow.metrics` (contributed by
+  marcelnoehre in #2): 14 scores in [0, 1] for line diagrams, in four
+  families (crossings, layering, slopes, clearance), with
+  `drawing_quality_scores` computing all of them and optional worst cases,
+  and `bottleneck_clearance_radius`. They take a laid-out `GraphData` or a
+  `networkx.DiGraph`; a `GraphData` is scored as drawn, so DimFlux layouts
+  are scored upright. On all 635 drawings of a drawing-algorithm study (eight
+  layout algorithms, 12 to 781 concepts) they reproduce the original
+  implementation's scores to within 1e-9. Guide page *Drawing quality*.
+
+### Changed
+
+- The README's first example saves a matplotlib figure instead of
+  compiling TikZ, so it runs after a plain `pip install` without LaTeX; the
+  README's examples are now tested like the documentation's.
+- CI also tests what users install: a new job builds the wheel and the
+  sdist, checks them with `twine check --strict`, installs each into its own
+  clean environment and runs a smoke test from outside the repository
+  (`.github/scripts/smoke_test_installed.py`), which also verifies that the
+  package, not the source tree, is imported. The same script passed against
+  the published 0.5.0 from PyPI.
+- CI runs the tests on Python 3.13 as well. On scikit-learn 1.5.2 only the
+  estimator checks are left out (they need scikit-learn 1.6); the
+  scikit-learn compatibility and documentation tests, previously skipped
+  there, pass and now run.
+- New workflow tests run whole chains on the bundled contexts too large for
+  exhaustive checks (lattice, canonical basis and GreConD, validated through
+  their defining properties) and from a raw table to a tuned classifier with
+  `GridSearchCV` and to rule-based outlier explanations.
+
 ## 0.5.0 (2026-10-30)
 
 Mostly fixes from audits of the whole package: every part was checked

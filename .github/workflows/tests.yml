@@ -20,6 +20,8 @@ jobs:
         include:
           - python: "3.12"
             sklearn: "1.6.1"  # oldest version the estimator checks support
+          - python: "3.13"
+            sklearn: "latest"
           - python: "3.14"
             sklearn: "latest"
     steps:
@@ -40,8 +42,9 @@ jobs:
         run: pytest -q
 
   oldest-scikit-learn:
-    # scikit-learn 1.5 is the oldest version ConceptFlow supports; its
-    # estimator checks predate the tags API, so those tests are left out.
+    # scikit-learn 1.5 is the oldest version ConceptFlow supports. Only the
+    # estimator checks are left out: they use
+    # parametrize_with_checks(expected_failed_checks=...), new in 1.6.
     name: Python 3.12, scikit-learn 1.5.2 (without estimator checks)
     runs-on: ubuntu-latest
     steps:
@@ -57,8 +60,6 @@ jobs:
         run: >
           pytest -q
           --ignore=tests/test_check_estimator.py
-          --ignore=tests/test_sklearn_compatibility.py
-          --ignore=tests/test_docs_examples.py
 
   docs:
     name: Documentation
@@ -97,6 +98,37 @@ jobs:
       - name: Run the tests
         run: pytest -q
 
+  package:
+    # What users install, not the source tree: build the wheel and the sdist,
+    # check their metadata, install each into its own clean environment and
+    # run a smoke test from outside the repository with python -I, so that
+    # src/ cannot be imported by accident.
+    name: Built package (wheel and sdist)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build and check the distributions
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check --strict dist/*
+          echo "VERSION=$(python -c "exec(open('src/conceptflow/_version.py').read()); print(__version__)")" >> "$GITHUB_ENV"
+      - name: Install and test the wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-env"
+          "$RUNNER_TEMP/wheel-env/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-env/bin/python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_test_installed.py" "$VERSION"
+      - name: Install and test the sdist
+        run: |
+          python -m venv "$RUNNER_TEMP/sdist-env"
+          "$RUNNER_TEMP/sdist-env/bin/pip" install dist/*.tar.gz
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/sdist-env/bin/python" -I "$GITHUB_WORKSPACE/.github/scripts/smoke_test_installed.py" "$VERSION"
+
   browser:
     # The interactive (D3) pages in headless Firefox: drawing, labels,
     # clicks, navigation, downloads and notebook embedding.
@@ -126,4 +158,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check src tests examples benchmarks
+      - run: ruff check src tests examples benchmarks .github/scripts

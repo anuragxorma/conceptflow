@@ -7,7 +7,7 @@ authors:
     given-names: Anurag
     orcid: "https://orcid.org/0009-0000-8292-3092"
     affiliation: University of Kassel
-version: 0.5.0
+version: 0.6.0
 date-released: "2026-10-30"
 license: BSD-3-Clause
 repository-code: "https://github.com/anuragxorma/conceptflow"

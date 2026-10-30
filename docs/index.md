@@ -20,9 +20,11 @@ ConceptFlow requires Python 3.12 or newer.
 | [Concept lattices](guide/lattices.md) | NextClosure and Close-by-One on bitsets, iceberg lattices, navigation (join, meet, up-sets, object and attribute concepts) |
 | [Implications and rules](guide/rules.md) | canonical (Duquenne-Guigues) basis with LinCbO, proper-premise basis, near-implications (Luxenburger basis), minimal generators |
 | [Concept measures](guide/measures.md) | stability (exact and bounds), Δ-measure, entropy, information gain, lattice indices |
+| [Scale-measures and order indices](guide/scale-measures.md) | coarser views of a context and their verification, refinement pairs, lattice width, height and incomparable pairs |
 | [Conceptual scaling](guide/scaling.md) | seven scale types and explicit missing-value handling for many-valued data |
 | [scikit-learn](guide/sklearn.md) | scaling, concept and implication features, and an implication-based outlier detector |
 | [Visualization](guide/visualization.md) | interactive HTML, DimFlux and layered layouts, matplotlib, Graphviz and TikZ export |
+| [Drawing quality](guide/drawing-quality.md) | 14 quality metrics for line diagrams: crossings, layering, slopes, clearance |
 | [Nested line diagrams](guide/nested.md) | Toscana-style nested diagrams, realized/unrealized combinations as data |
 | [Data quality](guide/quality.md) | rule violations, redundant objects and attributes, explanations |
 | [Factorization](guide/decomposition.md) | Boolean matrix factorization (GreConD, ASSO), ordinal two-factorization |

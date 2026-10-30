@@ -25,7 +25,10 @@ A drawing is a ``GraphData`` whose nodes all have coordinates (from
 ``layered_layout`` or ``lattice_to_graph_data_dimflux``, for example), or a
 ``networkx.DiGraph`` with ``x`` and ``y`` node attributes. An edge ``u -> v``
 means ``u < v``, as in ``GraphData`` (source = lower concept), so it does not
-matter whether ``y`` grows upwards or downwards.
+matter whether ``y`` grows upwards or downwards. A ``GraphData`` is scored as
+it is drawn: layouts such as DimFlux's, which the renderers turn upright,
+are scored upright (the coordinates ``layout_positions`` returns); a graph
+is scored with its coordinates as given.
 
 Thresholds such as "too close" are relative to the average length of a cover
 edge, so the scores do not depend on the scale or position of the drawing.
@@ -46,7 +49,7 @@ from scipy.spatial import cKDTree
 from sklearn.utils import check_scalar
 
 from conceptflow.algorithms._bitset import iter_bits
-from conceptflow.visualization.graph_data import GraphData
+from conceptflow.visualization.graph_data import GraphData, needs_rotation
 
 # Slopes of the edges in a standard drawing: arctan(4/5), 45°, arctan(3/2), 90°.
 DEFAULT_CANONICAL_ANGLES = (
@@ -175,7 +178,16 @@ def _check_drawing(drawing) -> _Drawing:
                 "drawing out first, e.g. with layered_layout() or lattice_to_graph_data_dimflux()."
             )
         nodes = drawing.node_ids()
-        xy = np.array([(node.x, node.y) for node in drawing.nodes], dtype=float)
+        if needs_rotation(drawing):
+            # Score the drawing as it is shown: the renderers turn layouts
+            # such as DimFlux's upright (top above bottom), so their stored
+            # coordinates are not what a reader sees.
+            from conceptflow.visualization.static import _lattice_positions
+
+            _, positions = _lattice_positions(drawing)
+            xy = np.array([positions[node] for node in nodes], dtype=float)
+        else:
+            xy = np.array([(node.x, node.y) for node in drawing.nodes], dtype=float)
         edges = [(edge.source, edge.target) for edge in drawing.edges]
     elif isinstance(drawing, nx.DiGraph):
         nodes = list(drawing.nodes)

@@ -162,3 +162,32 @@ def test_label_fallback_never_contradicts_the_lattice_labels(seed, min_support):
         assert set(derived_objects[node.node_id]) <= set(stored_objects[node.node_id])
         if min_support is None:
             assert sorted(derived_objects[node.node_id]) == sorted(stored_objects[node.node_id])
+
+
+@pytest.mark.parametrize("layout", ["layered", "dimflux"])
+def test_layout_positions_are_keyed_by_extent_and_upright(layout):
+    from conceptflow.core import scale_measure
+    from conceptflow.datasets import load_context
+    from conceptflow.visualization import layout_positions
+
+    context = load_context("livingbeings_en")
+    lattice = ConceptLattice.from_context(context)
+    positions = layout_positions(plot_lattice(lattice, backend="graph_data", layout=layout))
+
+    assert set(positions) == {
+        frozenset(context.objects[i] for i in c.extent) for c in lattice.concepts
+    }
+    top, bottom = max(positions, key=len), min(positions, key=len)
+    assert positions[top][1] > positions[bottom][1]  # as drawn: top above bottom
+    for concept in lattice.concepts:  # every upper neighbour is drawn higher
+        extent = frozenset(context.objects[i] for i in concept.extent)
+        for parent in lattice.parents(concept):
+            above = frozenset(context.objects[i] for i in parent.extent)
+            assert positions[above][1] > positions[extent][1]
+
+    # The concepts of a scale-measure are found in its context's layout.
+    scale = scale_measure(context, context.attributes[:3])
+    coarse = layout_positions(
+        plot_lattice(ConceptLattice.from_context(scale), backend="graph_data", layout=layout)
+    )
+    assert set(coarse) <= set(positions)

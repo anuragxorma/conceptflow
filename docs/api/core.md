@@ -13,3 +13,5 @@ FCA data structures: contexts, concepts, lattices and context operations.
 ::: conceptflow.core.incomplete_context.IncompleteContext
 
 ::: conceptflow.core.operations
+
+::: conceptflow.core.scale_measures

@@ -197,3 +197,19 @@ def test_rule_mining_and_incomplete_context_public_api_imports():
     assert implication_exceptions is not None
     assert render_lattice_matplotlib is not None
     assert render_nested_matplotlib is not None
+
+
+def test_scale_measure_and_order_index_public_api_imports():
+    from conceptflow.core import is_scale_measure, refines, scale_measure, scale_measure_problems
+    from conceptflow.metrics import (
+        concept_levels,
+        incomparable_pairs,
+        lattice_height,
+        lattice_width,
+    )
+    from conceptflow.visualization import layout_positions
+
+    for function in (scale_measure, is_scale_measure, scale_measure_problems, refines,
+                     concept_levels, lattice_width, lattice_height, incomparable_pairs,
+                     layout_positions):
+        assert callable(function)

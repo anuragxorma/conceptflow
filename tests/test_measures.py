@@ -166,3 +166,41 @@ def test_estimator_iceberg_features():
 
     assert all(len(c.extent) >= 10 for c in est.concepts_)
     assert est.get_lattice().is_iceberg
+
+
+@pytest.mark.parametrize(
+    "incidence, width, height, incomparable",
+    [
+        (np.eye(3), 3, 3, 3),                    # M3: top, three atoms, bottom
+        (np.tril(np.ones((4, 4))), 1, 4, 0),     # a chain of four concepts
+        (1 - np.eye(4), 6, 5, 55),               # the Boolean lattice 2^4
+        (np.ones((1, 1)), 1, 1, 0),              # a single concept
+    ],
+)
+def test_order_indices_on_known_lattices(incidence, width, height, incomparable):
+    from conceptflow.metrics import incomparable_pairs, lattice_height, lattice_width
+
+    lattice = ConceptLattice.from_context(FormalContext.from_array(incidence.astype(int)))
+    assert lattice_width(lattice) == width
+    assert lattice_height(lattice) == height
+    assert incomparable_pairs(lattice) == incomparable
+
+
+def test_concept_levels_count_the_longest_chain_below():
+    from conceptflow.metrics import concept_levels, lattice_height
+
+    lattice = ConceptLattice.from_context(FormalContext.from_array(1 - np.eye(3, dtype=int)))
+    levels = dict(zip((len(c.extent) for c in lattice.concepts), concept_levels(lattice)))
+    # 2^3: bottom (no objects) 1, atoms 2, coatoms 3, top (three objects) 4.
+    assert levels == {0: 1, 1: 2, 2: 3, 3: 4}
+    assert lattice_height(lattice) == 4
+
+
+def test_order_indices_on_iceberg_lattices():
+    from conceptflow.metrics import concept_levels, lattice_height, lattice_width
+
+    lattice = ConceptLattice.from_context(FormalContext.from_array(1 - np.eye(4, dtype=int)),
+                                          min_support=2)
+    # Concepts with at least two objects of 2^4: top, 4 coatoms, 6 middle ones.
+    assert lattice_width(lattice) == 6 and lattice_height(lattice) == 3
+    assert sorted(concept_levels(lattice).tolist()) == [1] * 6 + [2] * 4 + [3]

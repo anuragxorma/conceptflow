@@ -260,3 +260,25 @@ def needs_rotation(graph_data: GraphData) -> bool:
     smallest = min(extents, key=len)
     largest = max(extents, key=len)
     return all(smallest <= e for e in extents) and all(e <= largest for e in extents)
+
+
+def layout_positions(graph_data: GraphData) -> dict[frozenset[str], tuple[float, float]]:
+    """
+    Where each concept is drawn: ``{extent: (x, y)}``.
+
+    The extent is the frozenset of object names, so two layouts of lattices
+    on the same objects (for example a scale-measure and its context) can be
+    matched concept by concept. The coordinates are those of the drawing a
+    reader sees in the matplotlib, TikZ and interactive figures: upright,
+    with y growing upwards and the top concept above the bottom one, so a
+    DimFlux layout is rotated as it is when drawn. Layout-free GraphData
+    gets the layered layout first.
+    """
+    from conceptflow.visualization.static import _lattice_positions
+
+    graph_data, positions = _lattice_positions(graph_data)
+    return {
+        # + 0.0 turns -0.0 into 0.0
+        frozenset(node.metadata["extent"]): tuple(float(v) + 0.0 for v in positions[node.node_id])
+        for node in graph_data.nodes
+    }
