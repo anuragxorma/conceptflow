@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 from matplotlib.figure import Figure  # noqa: E402
 
 from conceptflow import ConceptLattice, FormalContext, plot_lattice  # noqa: E402
-from conceptflow.visualization import plot_nested  # noqa: E402
+from conceptflow.visualization import plot_nested, render_lattice_matplotlib  # noqa: E402
 from conceptflow.visualization.static import _upright  # noqa: E402
 from tests.test_nested_combinations import make_nested_view  # noqa: E402
 
@@ -76,8 +76,10 @@ def test_static_lattice_matches_interactive_orientation():
             attributes=list("abcd"),
         )
     )
+    # One layout for both: DimFlux is time-limited, so two separate runs can
+    # differ slightly on a slow machine, which is not what is tested here.
     graph_data = plot_lattice(lattice, backend="graph_data")
-    fig = plot_lattice(lattice, backend="matplotlib")
+    fig = render_lattice_matplotlib(graph_data)
 
     static_x = fig.axes[0].collections[1].get_offsets()[:, 0]
     interactive_x = [node.x for node in graph_data.nodes]

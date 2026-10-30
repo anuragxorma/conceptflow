@@ -49,7 +49,9 @@ not exist; heights are kept, so every edge still points upward.
 DimFlux takes seconds for small lattices but can take minutes beyond a few
 hundred concepts; ConceptFlow warns above 150 concepts. `timeout_ms`
 (default 1000) limits each of its optimization phases loosely, not the total
-run time.
+run time. Because of that time limit, DimFlux coordinates can differ
+slightly between runs on a slow or busy machine; for exactly reproducible
+coordinates use `layout="layered"` or `timeout_ms=None` (no limit, slower).
 
 ```python
 fig = cf.plot_lattice(lattice, backend="matplotlib")   # DimFlux layout
@@ -118,6 +120,9 @@ Nested line diagrams have the same backends; see
 
 ## Known limitations
 
+- **DimFlux coordinates are not exactly reproducible** on slow or busy
+  machines, since its optimization is time-limited (see *Layouts* above);
+  `layout="layered"` is deterministic.
 - **Crowded layouts.** No edge is drawn through a concept it does not
   connect, but in crowded rows of the layered layout an edge can pass close
   to one: a concept is only moved where it keeps its distance to all others.
