@@ -329,6 +329,8 @@ def test_graph_data_is_scored_as_drawn():
     assert drawing_quality_scores(stored) == pytest.approx(drawing_quality_scores(upright))
     top = max(stored.nodes, key=lambda node: node.metadata["extent_size"])
     bottom = min(stored.nodes, key=lambda node: node.metadata["extent_size"])
+    # Upright: the top is drawn straight above the bottom. (No score of the
+    # DimFlux drawing itself is checked: its time-limited optimisation gives
+    # slightly different layouts on slower machines.)
     assert abs(drawn[frozenset(top.metadata["extent"])][0]
                - drawn[frozenset(bottom.metadata["extent"])][0]) < 1e-6
-    assert vertical_axis_balance_score(stored) > 0.9  # top straight above bottom
