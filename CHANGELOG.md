@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `debug_filled_pairs` and `debug_bottom_outer` warned that they would be
+  removed in 0.6.0, but 0.6.0 still contains them. They are now announced
+  for removal in 0.7.0, which keeps them working for the full minor release
+  the deprecation policy promises.
+
 ## 0.6.0 (2026-10-30)
 
 New: scale-measures (coarser views of a context, with verification and

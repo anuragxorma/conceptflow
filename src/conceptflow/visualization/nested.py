@@ -153,12 +153,12 @@ def debug_filled_pairs(view: ExplorationView) -> None:
     Ends with a focused block for the bottom-most outer concept.
 
     .. deprecated:: 0.5.0
-        A development tool that only prints; removed in 0.6.0. The filled
+        A development tool that only prints; removed in 0.7.0. The filled
         pairs are available as data from
         ``conceptflow.exploration.realized_pairs``.
     """
     warn_deprecated(
-        "debug_filled_pairs", "conceptflow.exploration.realized_pairs", "0.6.0"
+        "debug_filled_pairs", "conceptflow.exploration.realized_pairs", "0.7.0"
     )
     top_concept = view.lattice.top()
     top_id = top_concept.stable_id()
@@ -314,12 +314,12 @@ def debug_bottom_outer(view: ExplorationView) -> None:
     plot_nested; it does not affect the diagram.
 
     .. deprecated:: 0.5.0
-        A development tool that only prints; removed in 0.6.0. The filled
+        A development tool that only prints; removed in 0.7.0. The filled
         pairs are available as data from
         ``conceptflow.exploration.realized_pairs``.
     """
     warn_deprecated(
-        "debug_bottom_outer", "conceptflow.exploration.realized_pairs", "0.6.0"
+        "debug_bottom_outer", "conceptflow.exploration.realized_pairs", "0.7.0"
     )
     top_concept = view.lattice.top()
     top_id = top_concept.stable_id()

@@ -153,6 +153,6 @@ def test_latex_in_names_on_the_interactive_nested_page():
 def test_debug_printers_are_deprecated(name, capsys):
     import conceptflow.visualization as visualization
 
-    with pytest.warns(DeprecationWarning, match=rf"{name} is deprecated.*0\.6\.0"):
+    with pytest.warns(DeprecationWarning, match=rf"{name} is deprecated.*0\.7\.0"):
         getattr(visualization, name)(make_nested_view())
     assert capsys.readouterr().out  # still works until it is removed
