@@ -49,7 +49,9 @@ with objects in DataFrame row order and attributes M_outer.
 
 `builder.expand_all(parent=root, scales=inner_scales)` builds K_inner (for the
 top outer concept, which has all objects) by restricting the MVC to the top
-concept's extent and applying a second `ConceptualScaler` with the inner scales.
+concept's extent and transforming it with a second `ConceptualScaler` with the
+inner scales, fit on the full MVC (so every child view has the same
+attributes, including values its objects lack).
 
 **K itself is never constructed.**  The implementation reaches image(φ) — the
 set of filled coordinate pairs — without ever building B(K).

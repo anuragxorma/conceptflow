@@ -77,16 +77,24 @@ class ExplorationBuilder:
             )
 
     def _scale(self, mvc: ManyValuedContext, scales: list[Scale]):
-        """Scale ``mvc`` into a formal context with this builder's policy."""
+        """
+        Scale ``mvc`` into a formal context with this builder's policy.
+
+        The scales are fit on all of the builder's data, so a view of some
+        objects has the same attributes as the view of all objects, including
+        values its objects lack: the "≠ v" of a contranominal scale holds for
+        all of them, and dropping it would change their intents.
+        """
         self._check_scales(scales)
         scaler = ConceptualScaler(
             scales=scales,
             output="context",
-            missing=self.missing,
-        )
+            missing="false",  # the vocabulary; missing values are checked below
+        ).fit(self.mvc)
+        scaler.set_params(missing=self.missing)
 
         try:
-            return scaler.fit_transform(mvc)
+            return scaler.transform(mvc)
         except ValueError as exc:
             if "Input contains NaN" not in str(exc):
                 raise
@@ -126,6 +134,10 @@ class ExplorationBuilder:
     ) -> ExplorationView:
         """
         Expand one parent concept into a child exploration view.
+
+        The child view scales the objects of ``concept`` with ``scales``,
+        fit on all of the builder's data: it has the same attributes as a view
+        of all objects with these scales.
         """
         if not self._is_expandable(concept):
             raise ValueError(

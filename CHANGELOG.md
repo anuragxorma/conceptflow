@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- `ExplorationBuilder` fits the scales of child views on all of its data
+  instead of only the objects of the expanded concept. A child view of
+  some objects now has the same attributes as a view of all objects. Before,
+  values missing among those objects were dropped, which for a
+  contranominal scale removed an attribute ("≠ value") that all of them
+  have, and changed their intents.
 - `debug_filled_pairs` and `debug_bottom_outer` warned that they would be
   removed in 0.6.0, but 0.6.0 still contains them. They are now announced
   for removal in 0.7.0, which keeps them working for the full minor release

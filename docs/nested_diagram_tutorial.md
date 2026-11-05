@@ -343,7 +343,8 @@ outer_context = ConceptualScaler(scales=outer_scales, output="context").fit_tran
 
 # builder.expand_all() internally does, for the top outer concept:
 object_names = [mvc.objects[i] for i in sorted(top_concept.extent)]
-inner_context = ConceptualScaler(scales=inner_scales, output="context").fit_transform(
+scaler = ConceptualScaler(scales=inner_scales, output="context").fit(mvc)  # all values
+inner_context = scaler.transform(
     mvc.restrict_objects(object_names)  # full extent for template
 )
 ```

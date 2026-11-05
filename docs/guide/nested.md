@@ -69,6 +69,8 @@ html = plot_nested(outer, title="Coma and pH")
 
 `expand_all` takes filters (`min_extent_size=`, `include_bottom=`,
 `predicate=`); `expand(parent, concept, name, scales)` expands one concept.
+Child views are scaled with the scales fit on all the data, so they have the
+same attributes as a view of all objects.
 Many-valued data with missing values needs
 `ExplorationBuilder(..., missing="false")`; see
 [Conceptual scaling](scaling.md#missing-values).
