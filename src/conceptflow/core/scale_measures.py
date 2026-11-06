@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import numbers
 from collections.abc import Iterable
+from collections.abc import Set as AbstractSet
 
 import numpy as np
 
@@ -47,7 +48,9 @@ def scale_measure(
     Each entry of ``attributes`` is one attribute of ``context`` (a name or
     a position), kept as it is, or a tuple of them, which becomes their
     conjunction: an object has it iff it has every part. The conjunction of
-    ``"a"`` and ``"b"`` is named ``"a ∧ b"``. ``None`` returns ``context``.
+    ``"a"`` and ``"b"`` is named ``"a ∧ b"``: parts are named in the order
+    given, or, for a set, in the order of ``context``'s attributes.
+    ``None`` returns ``context``.
 
     The objects stay those of ``context``, in the same order. The attributes
     are put in one canonical order: by the positions of their parts in
@@ -71,6 +74,8 @@ def scale_measure(
         if not parts:
             raise ValueError("A conjunction needs at least one attribute.")
         indices = context._resolve_attribute_indices(parts)
+        if isinstance(entry, AbstractSet):
+            indices = tuple(sorted(indices))  # a set has no order of its own
         entries.append((tuple(sorted(indices)), indices))
     entries.sort(key=lambda item: item[0])  # stable: equal keys keep their order
 
@@ -93,6 +98,10 @@ def scale_measure_problems(original: FormalContext, scale: FormalContext) -> lis
     of its attributes is an extent of ``original``, i.e. equals its own
     closure there (Hanika & Hirth, Prop. 20). That is one closure per
     attribute; the scale's lattice is not enumerated.
+
+    A scale with the same objects in another order is reported as having
+    different objects; ``scale.subcontext(objects=original.objects)`` puts
+    them in the original's order. ``refines`` matches objects by name.
     """
     if tuple(scale.objects) != tuple(original.objects):
         return ["object sets differ, so the identity is not a map between them"]

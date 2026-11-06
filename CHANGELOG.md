@@ -34,11 +34,22 @@
   `min_extent_size`/`max_extent_size`, a `name_template` with unknown
   fields and a non-callable `predicate` raise a clear error before anything
   is expanded.
+- `scale_measure` names a conjunction given as a set in the order of the
+  context's attributes. Before, the name depended on Python's hash order
+  and could change between runs.
+- The drawing quality metrics reject a `networkx.MultiDiGraph` with a clear
+  `TypeError` instead of crashing.
+- The nested diagram's check that the outer and inner views list the same
+  objects in the same order is a `ValueError` instead of an `assert`, so it
+  also runs under `python -O`.
+
 
 ### Documentation
 
 - `ExplorationBuilder.expand` and `ExplorationView.add_child` state that
-  expanding a concept again replaces its child view.
+  expanding a concept again replaces its child view;
+  `scale_measure_problems` says how to compare a scale whose objects are in
+  another order.
 
 ## 0.6.0 (2026-10-30)
 

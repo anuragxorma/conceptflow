@@ -41,6 +41,16 @@ def test_canonical_order_is_by_sorted_positions_of_the_parts():
     assert scale.attributes == (f"c{CONJUNCTION}a", "b", f"b{CONJUNCTION}d", "d")
 
 
+def test_parts_of_a_set_are_named_in_column_order():
+    context = make_context()
+    # A set has no order of its own; the name must not depend on hashing.
+    assert scale_measure(context, [{"c", "a"}, frozenset({"d", "b"})]).attributes == (
+        f"a{CONJUNCTION}c",
+        f"b{CONJUNCTION}d",
+    )
+    assert scale_measure(context, [("c", "a")]).attributes == (f"c{CONJUNCTION}a",)
+
+
 def test_an_attribute_that_is_not_an_extent_fails():
     context = make_context()
     # {g1, g2} is not an extent: its closure is {g1, g2, g4}, the extent of a.
@@ -66,6 +76,7 @@ def test_other_objects_are_rejected():
     assert scale_measure_problems(context, reordered) == [
         "object sets differ, so the identity is not a map between them"
     ]
+    assert is_scale_measure(context, reordered.subcontext(objects=context.objects))
 
 
 @pytest.mark.parametrize(

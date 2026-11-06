@@ -557,11 +557,12 @@ def _nested_data(
 
         # Subdirect product filling: join-closure of coordinate pairs.
         # obj_idx must refer to the same object in both lattice contexts.
-        assert list(view.context.objects) == list(template_view.context.objects), (
-            "Object order mismatch between outer and inner contexts: "
-            f"outer={list(view.context.objects)[:5]}... "
-            f"inner={list(template_view.context.objects)[:5]}..."
-        )
+        if list(view.context.objects) != list(template_view.context.objects):
+            raise ValueError(
+                "Outer and inner contexts must have the same objects in the same "
+                f"order, got outer={list(view.context.objects)[:5]}... and "
+                f"inner={list(template_view.context.objects)[:5]}..."
+            )
 
         # Apposition requires M_outer ∩ M_inner = ∅.  Without disjointness the
         # join-closure of factor-lattice pairs no longer equals image(φ) and the

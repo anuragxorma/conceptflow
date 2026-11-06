@@ -97,3 +97,18 @@ def test_nested_combinations_requires_inner_view():
 
     with pytest.raises(ValueError, match="inner view"):
         nested_combinations(root)
+
+
+def test_nested_data_rejects_inner_views_with_other_object_order():
+    from conceptflow.exploration import ExplorationView
+
+    root = make_nested_view()
+    top_id = root.lattice.top().stable_id()
+    inner = root.children[top_id]
+    reordered = inner.context.subcontext(objects=inner.context.objects[::-1])
+    root.children[top_id] = ExplorationView(
+        name=inner.name, context=reordered, lattice=ConceptLattice.from_context(reordered),
+        depth=inner.depth, scale_names=inner.scale_names, parent_concept_id=top_id,
+    )
+    with pytest.raises(ValueError, match="same objects in the same order"):
+        exploration_view_to_nested_data(root)

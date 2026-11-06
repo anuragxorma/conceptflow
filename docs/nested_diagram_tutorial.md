@@ -351,8 +351,8 @@ inner_context = scaler.transform(
 
 The crucial invariant: both scalers iterate over `mvc.objects` in the same DataFrame row
 order. Object index $i$ in $K_\text{outer}$ is the same winner as object index $i$ in
-$K_\text{inner}$. The filling algorithm depends on this shared index — an assertion in
-the code verifies it before any fills are computed.
+$K_\text{inner}$. The filling algorithm depends on this shared index — the code
+checks it before any fills are computed and raises `ValueError` otherwise.
 
 ### The ExplorationView tree
 
@@ -481,11 +481,11 @@ The index $i$ is used as a shared key to pair $\gamma_\text{outer}(g)$ with
 $\gamma_\text{inner}(g)$ for the same object $g$. If the outer and inner contexts stored
 their objects in different orders, index 3 in the outer lattice would be a different
 winner than index 3 in the inner lattice, and the seed pairs would be wrong — pairing
-unrelated concepts. The assertion catches this before any damage is done.
+unrelated concepts. A `ValueError` stops this before any damage is done.
 
 ### The disjointness check
 
-Before the assertion, the code also verifies $M_\text{outer} \cap M_\text{inner} = \emptyset$.
+After the object-order check, the code also verifies $M_\text{outer} \cap M_\text{inner} = \emptyset$.
 If a scale attribute name appears in both factor contexts, the apposition structure breaks
 and the bridging lemma's sandwiching argument fails. A runtime `ValueError` with the
 overlapping names is raised.

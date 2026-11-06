@@ -189,6 +189,12 @@ def _check_drawing(drawing) -> _Drawing:
         else:
             xy = np.array([(node.x, node.y) for node in drawing.nodes], dtype=float)
         edges = [(edge.source, edge.target) for edge in drawing.edges]
+    elif isinstance(drawing, nx.MultiDiGraph):
+        raise TypeError(
+            "A drawing must be a networkx.DiGraph, not a MultiDiGraph: a line diagram "
+            "has at most one edge between two nodes. networkx.DiGraph(graph) merges "
+            "parallel edges."
+        )
     elif isinstance(drawing, nx.DiGraph):
         nodes = list(drawing.nodes)
         try:

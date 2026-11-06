@@ -289,6 +289,11 @@ def test_invalid_input():
         slope_economy_score(drawing([], {"a": (0, np.nan)}))
     with pytest.raises(ValueError, match="no nodes"):
         slope_economy_score(nx.DiGraph())
+    multi = nx.MultiDiGraph([("a", "b"), ("a", "b")])
+    nx.set_node_attributes(multi, {"a": 0.0, "b": 1.0}, "y")
+    nx.set_node_attributes(multi, {"a": 0.0, "b": 0.0}, "x")
+    with pytest.raises(TypeError, match="MultiDiGraph"):
+        slope_economy_score(multi)
 
     graph = drawing(DIAMOND, SQUARE)
     with pytest.raises(ValueError, match="threshold_factor"):
