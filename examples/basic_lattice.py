@@ -20,6 +20,10 @@ def main():
     print("Number of concepts:", lattice.n_concepts)
     print("Number of Hasse edges:", len(lattice.edges))
 
+    # Other enumeration algorithms build the same lattice, e.g. Close-by-One.
+    same = cf.ConceptLattice.from_context(context, algorithm="closebyone")
+    print("Same lattice with Close-by-One:", lattice == same)
+
     print("\nConcepts (objects | shared attributes):")
     for concept in lattice.concepts:
         objects = ", ".join(context.objects[g] for g in sorted(concept.extent)) or "-"

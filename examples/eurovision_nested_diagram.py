@@ -17,6 +17,14 @@ Level 2 (inner lattice per outer node): musical attributes combined.
     - OrdinalScale: bpm_cat slow (<100) ≤ medium (100–124) ≤ fast (≥125)
     - DichotomicScale: key_mode minor vs. major
 
+Data: ``examples/data/eurovision_winners.csv``, one row per winner, derived
+from the Unofficial Eurovision Song Contest Dataset
+(https://github.com/EurovisionAPI/dataset) by ``build_dataframe`` below. To
+rebuild it from a clone of that dataset:
+
+    git clone https://github.com/EurovisionAPI/dataset.git eurovision-dataset
+    python -m examples.eurovision_nested_diagram --from-dataset eurovision-dataset
+
 Run from the project root:
 
     python -m examples.eurovision_nested_diagram
@@ -26,6 +34,7 @@ Output:
     eurovision_nested.html
 """
 
+import argparse
 import json
 from pathlib import Path
 
@@ -40,7 +49,7 @@ from conceptflow.visualization import plot_nested
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 
 # Next to this script, so the example runs from any folder.
-DATASET_ROOT = Path(__file__).resolve().parent / "eurovision-dataset" / "data" / "senior"
+WINNERS_CSV = Path(__file__).resolve().parent / "data" / "eurovision_winners.csv"
 
 CLUSTER_SUPPORT_THRESHOLD = 8  # average points from cluster members
 
@@ -146,8 +155,8 @@ def bpm_category(bpm: int) -> str:
     return "slow"
 
 
-def load_year_record(year: int) -> dict | None:
-    year_dir = DATASET_ROOT / str(year)
+def load_year_record(year: int, senior_root: Path) -> dict | None:
+    year_dir = senior_root / str(year)
     final_path = year_dir / "rounds" / "final.json"
 
     if not final_path.exists():
@@ -206,13 +215,15 @@ def load_year_record(year: int) -> dict | None:
     }
 
 
-def build_dataframe() -> pd.DataFrame:
+def build_dataframe(dataset_root: Path) -> pd.DataFrame:
+    """The winners table from a clone of the Eurovision dataset."""
+    senior_root = Path(dataset_root) / "data" / "senior"
     records = {}
     for year in range(1975, 2026):
         if year == 2020:
             continue
         try:
-            record = load_year_record(year)
+            record = load_year_record(year, senior_root)
         except Exception as exc:
             print(f"  {year}: skipped ({exc})")
             continue
@@ -224,6 +235,15 @@ def build_dataframe() -> pd.DataFrame:
     df = pd.DataFrame.from_dict(records, orient="index")
     df.index.name = "year"
     return df
+
+
+def load_winners() -> pd.DataFrame:
+    """The winners table shipped with this example (see ``build_dataframe``)."""
+    return pd.read_csv(
+        WINNERS_CSV,
+        index_col="year",
+        dtype={"year": str, "country": str, "key_mode": str},
+    )
 
 
 def _gamma(lattice) -> dict[int, str]:
@@ -507,7 +527,7 @@ def print_implication_report(basis: list[dict]) -> None:
 
 def main() -> None:
     print("Loading Eurovision winner data + voting records...")
-    df = build_dataframe()
+    df = load_winners()
     print(f"\nLoaded {len(df)} winners.")
 
     print("\nVoting cluster support:")
@@ -556,7 +576,6 @@ def main() -> None:
         name_template="music: {label}",
         min_extent_size=1,
         include_top=True,
-        include_bottom=True,
     )
 
     basis = compute_implication_basis(root)
@@ -576,4 +595,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
+    parser.add_argument(
+        "--from-dataset",
+        metavar="DIR",
+        help="rebuild examples/data/eurovision_winners.csv from a clone of the dataset",
+    )
+    args = parser.parse_args()
+    if args.from_dataset:
+        build_dataframe(Path(args.from_dataset)).to_csv(WINNERS_CSV)
+        print(f"Wrote {WINNERS_CSV}")
+    else:
+        main()

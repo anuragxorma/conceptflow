@@ -1,3 +1,0 @@
-[submodule "examples/eurovision-dataset"]
-	path = examples/eurovision-dataset
-	url = https://github.com/EurovisionAPI/dataset.git

@@ -1,5 +1,5 @@
 """
-Experimental Toscana-style nested diagram example for ConceptFlow.
+Toscana-style nested diagram example for ConceptFlow.
 
 This example uses synthetic many-valued data inspired by nested line diagrams:
 
@@ -154,7 +154,6 @@ def main() -> None:
         name_template="pH level view: {label}",
         min_extent_size=0,
         include_top=True,
-        include_bottom=True,
     )
 
     for ph_view in ph_views:
@@ -164,7 +163,6 @@ def main() -> None:
             name_template="symptom duration view: {label}",
             min_extent_size=0,
             include_top=True,
-            include_bottom=True,
         )
 
     fig_default = plot_nested(

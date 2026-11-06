@@ -43,6 +43,18 @@
   objects in the same order is a `ValueError` instead of an `assert`, so it
   also runs under `python -O`.
 
+### Repository
+
+- The Eurovision example reads its 50-row table from
+  `examples/data/eurovision_winners.csv` instead of the whole Eurovision
+  dataset as a git submodule (82 MB); its output is unchanged, and
+  `--from-dataset` rebuilds the table from a clone of the dataset. Cloning
+  the repository no longer involves a submodule.
+- Removed the top-level `data/` folder: its `.cxt` files were not used by the
+  package, the tests, the examples or the documentation. The bundled
+  datasets (`conceptflow.datasets`) are unaffected.
+- `examples/closebyone_lattice.py` is merged into `examples/basic_lattice.py`;
+  the examples no longer pass `include_bottom`, which has no effect.
 
 ### Documentation
 
