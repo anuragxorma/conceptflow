@@ -4,7 +4,10 @@ Builder API for nested conceptual exploration.
 
 from __future__ import annotations
 
+import numbers
 from collections.abc import Callable
+
+from sklearn.utils import check_scalar
 
 from conceptflow.core import Concept, ConceptLattice, ManyValuedContext
 from conceptflow.exploration.view import ExplorationView
@@ -112,6 +115,19 @@ class ExplorationBuilder:
         """
         return len(concept.extent) > 0
 
+    @staticmethod
+    def _is_concept_of(view: ExplorationView, concept: Concept) -> bool:
+        """Whether ``concept`` is a concept of ``view``'s context."""
+        context = view.context
+        if not all(0 <= g < context.n_objects for g in concept.extent) or not all(
+            0 <= m < context.n_attributes for m in concept.intent
+        ):
+            return False
+        return (
+            context.object_derivation(concept.extent) == concept.intent
+            and context.attribute_derivation(concept.intent) == concept.extent
+        )
+
     def _object_names_from_parent_extent(
         self,
         parent: ExplorationView,
@@ -138,7 +154,15 @@ class ExplorationBuilder:
         The child view scales the objects of ``concept`` with ``scales``,
         fit on all of the builder's data: it has the same attributes as a view
         of all objects with these scales.
+        ``concept`` must be a concept of ``parent.lattice``. Expanding a
+        concept that already has a child view replaces that view.
         """
+        if not self._is_concept_of(parent, concept):
+            raise ValueError(
+                f"The concept is not a concept of the parent view {parent.name!r}. "
+                "Pass a concept from parent.lattice.concepts; concepts of other "
+                "views refer to other objects."
+            )
         if not self._is_expandable(concept):
             raise ValueError(
                 "Cannot expand a concept with an empty extent. "
@@ -208,8 +232,18 @@ class ExplorationBuilder:
         """
         Expand all selected expandable concepts of a parent view.
 
+        Concepts that already have a child view get a new one (see
+        ``expand``).
+
         Parameters
         ----------
+        name_template:
+            Name of each child view. May use ``{label}``, ``{intent}``,
+            ``{extent_size}`` and ``{depth}``.
+
+        min_extent_size, max_extent_size:
+            Expand only concepts with at least / at most this many objects.
+
         include_top:
             If False, skip the top concept (the one with every object in its
             extent).
@@ -220,11 +254,29 @@ class ExplorationBuilder:
             raises ValueError for it) regardless of this flag. Kept for
             backward-compatible signatures; do not rely on it to include or
             exclude anything.
+
+        predicate:
+            If given, expand only concepts for which ``predicate(concept)``
+            is true.
         """
         self._check_scales(scales)
         if not isinstance(name_template, str):
             raise TypeError(
                 f"name_template must be a string, got {name_template!r}."
+            )
+        try:
+            name_template.format(label="", intent="", extent_size=0, depth=0)
+        except (KeyError, IndexError, ValueError) as exc:
+            raise ValueError(
+                f"name_template {name_template!r} is not valid: it may use {{label}}, "
+                "{intent}, {extent_size} and {depth}."
+            ) from exc
+        check_scalar(min_extent_size, "min_extent_size", numbers.Integral, min_val=0)
+        if max_extent_size is not None:
+            check_scalar(max_extent_size, "max_extent_size", numbers.Integral, min_val=0)
+        if predicate is not None and not callable(predicate):
+            raise TypeError(
+                f"predicate must be a callable taking a Concept, got {predicate!r}."
             )
         children: list[ExplorationView] = []
 

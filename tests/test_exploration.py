@@ -159,3 +159,61 @@ def test_exploration_repr_contains_debug_information():
     assert "ExplorationView" in text
     assert "Region view" in text
     assert "n_concepts" in text
+
+
+def test_expand_rejects_a_concept_of_another_view():
+    builder = ExplorationBuilder(make_many_valued_context())
+    root = builder.root("region", scales=[NominalScale("region")])
+    eu = next(c for c in root.lattice.concepts if len(c.extent) == 2)
+    child = builder.expand(root, eu, "EU", scales=[NominalScale("sector")])
+    other = builder.root("sector", scales=[NominalScale("sector")])
+
+    for concept in root.lattice.concepts:  # indices of root, not of child
+        if concept not in set(child.lattice.concepts):
+            with pytest.raises(ValueError, match="not a concept of the parent view 'EU'"):
+                builder.expand(child, concept, "wrong", scales=[NominalScale("risk")])
+    foreign = next(c for c in other.lattice.concepts if c not in set(root.lattice.concepts))
+    with pytest.raises(ValueError, match="parent.lattice.concepts"):
+        builder.expand(root, foreign, "wrong", scales=[NominalScale("risk")])
+
+
+def test_expanding_again_replaces_the_child_view():
+    builder = ExplorationBuilder(make_many_valued_context())
+    root = builder.root("region", scales=[NominalScale("region")])
+    top = root.lattice.top()
+    builder.expand(root, top, "first", scales=[NominalScale("sector")])
+    builder.expand(root, top, "second", scales=[NominalScale("risk")])
+    assert root.child(top.stable_id()).name == "second"
+    assert len(root.children) == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs, error, match",
+    [
+        ({"min_extent_size": -1}, ValueError, "min_extent_size"),
+        ({"min_extent_size": 1.5}, TypeError, "min_extent_size"),
+        ({"max_extent_size": -1}, ValueError, "max_extent_size"),
+        ({"name_template": "{nope}"}, ValueError, "may use"),
+        ({"name_template": "{0}"}, ValueError, "may use"),
+        ({"name_template": "{label"}, ValueError, "may use"),
+        ({"predicate": 5}, TypeError, "predicate"),
+    ],
+)
+def test_expand_all_rejects_invalid_options(kwargs, error, match):
+    builder = ExplorationBuilder(make_many_valued_context())
+    root = builder.root("region", scales=[NominalScale("region")])
+    with pytest.raises(error, match=match):
+        builder.expand_all(root, scales=[NominalScale("sector")], **kwargs)
+    assert root.children == {}
+
+
+def test_expand_all_name_template_fields():
+    builder = ExplorationBuilder(make_many_valued_context())
+    root = builder.root("region", scales=[NominalScale("region")])
+    children = builder.expand_all(
+        root, scales=[NominalScale("sector")],
+        name_template="{label}|{intent}|{extent_size}|{depth}", max_extent_size=2,
+    )
+    assert sorted(child.name for child in children) == [
+        "region=EU|region=EU|2|1", "region=US|region=US|2|1",
+    ]

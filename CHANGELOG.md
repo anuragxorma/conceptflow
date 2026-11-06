@@ -26,6 +26,19 @@
   removed in 0.6.0, but 0.6.0 still contains them. They are now announced
   for removal in 0.7.0, which keeps them working for the full minor release
   the deprecation policy promises.
+- `ExplorationBuilder.expand` raises `ValueError` for a concept that is not
+  a concept of the parent view, e.g. one from another view. Before, it
+  silently built the child view from the wrong objects or failed with an
+  `IndexError`.
+- `ExplorationBuilder.expand_all` checks its options: a negative
+  `min_extent_size`/`max_extent_size`, a `name_template` with unknown
+  fields and a non-callable `predicate` raise a clear error before anything
+  is expanded.
+
+### Documentation
+
+- `ExplorationBuilder.expand` and `ExplorationView.add_child` state that
+  expanding a concept again replaces its child view.
 
 ## 0.6.0 (2026-10-30)
 

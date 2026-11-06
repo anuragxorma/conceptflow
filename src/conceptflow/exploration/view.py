@@ -26,6 +26,8 @@ class ExplorationView:
     def add_child(self, concept_id: str, child: "ExplorationView") -> None:
         """
         Attach a child exploration view to a concept in this view.
+
+        A child view already attached to the concept is replaced.
         """
         self.children[concept_id] = child
 
