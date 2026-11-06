@@ -373,6 +373,28 @@ template_view.context   # FormalContext K_inner (all objects)
 template_view.lattice   # ConceptLattice B(K_inner)
 ```
 
+### Deeper levels
+
+Expanding the child views again nests a third scale, and so on. Clicking a
+node of the interactive diagram zooms into it; every level reached this way is
+part of one nested line diagram of all the scales $K_1, \dots, K_k$ on the
+way. A node is a tuple $(c_1, \dots, c_k)$ of concepts, one per level, and
+it is drawn **filled** iff it is the image of a concept of the apposition
+$K_1 \mid \dots \mid K_k$ over all objects: with
+$X = \mathrm{ext}(c_1) \cap \dots \cap \mathrm{ext}(c_k)$,
+
+$$
+X' \cap M_i = \mathrm{int}(c_i) \quad \text{for every level } i.
+$$
+
+For two levels this is exactly the filling above. The levels below the one
+clicked are checked within the child views, which hold the objects of the
+clicked concept, scaled with the scales fit on all objects; the levels above
+are checked against the contexts of the views on the path. Each object $g$ is
+labelled once, at $(\gamma_1(g), \dots, \gamma_k(g))$. A filled tuple
+projects to filled tuples on every prefix, so a hollow node contains no filled
+node at any level below, and it cannot be entered.
+
 ### _gamma_local: finding the object concept
 
 ```python
@@ -393,7 +415,7 @@ function computes this for every object in the lattice at once, keyed by object 
 ### The join-closure loop
 
 ```python
-def _compute_filled_pairs(
+def join_closure_filled_pairs(
     outer_lattice,
     inner_lattice,
     gamma_outer: dict[int, str],   # obj_idx → outer concept stable_id

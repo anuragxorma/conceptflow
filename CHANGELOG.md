@@ -4,12 +4,24 @@
 
 ### Fixed
 
+- **Nested diagrams with three or more levels showed wrong filled nodes
+  below the second level.** Clicking through an `ExplorationBuilder` tree
+  in the interactive diagram, the third and deeper levels marked a
+  combination as filled when it occurred among the objects of the clicked
+  node, even if it was not a concept of the combined data; objects were
+  labelled under every outer node above their own; and hollow nodes could
+  be entered. Every level now follows the nested line diagram of all the
+  scales on the path, as the documentation describes: a node is filled iff
+  its combination of concepts is a concept of the combined context, each
+  object is labelled once, and only filled nodes can be entered. The first
+  two levels, `plot_nested(context, inner=...)`, the static backends and
+  `nested_combinations` were correct and are unchanged.
 - `ExplorationBuilder` fits the scales of child views on all of its data
   instead of only the objects of the expanded concept. A child view of
   some objects now has the same attributes as a view of all objects. Before,
   values missing among those objects were dropped, which for a
   contranominal scale removed an attribute ("≠ value") that all of them
-  have, and changed their intents.
+  have; this was the second cause of the wrong filled nodes above.
 - `debug_filled_pairs` and `debug_bottom_outer` warned that they would be
   removed in 0.6.0, but 0.6.0 still contains them. They are now announced
   for removal in 0.7.0, which keeps them working for the full minor release

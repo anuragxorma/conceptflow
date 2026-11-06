@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from conceptflow._deprecation import warn_deprecated
 from conceptflow.exploration.combinations import realized_pairs
@@ -40,6 +40,9 @@ from conceptflow.visualization._checks import html_page_layout, object_formatter
 from conceptflow.visualization._text import display_text
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.html_figure import HTMLFigure, script_json
+
+if TYPE_CHECKING:
+    from conceptflow.core import FormalContext
 
 
 def _mu_local(lattice) -> dict[int, str]:
@@ -118,27 +121,6 @@ def _inner_template_data(
     }
 
 
-def _compute_filled_pairs(
-    outer_lattice,
-    inner_lattice,
-) -> dict[str, set[str]]:
-    """
-    Compute filled (outer_id, inner_id) coordinate pairs of the subdirect product.
-
-    A pair is filled iff it is the projection of some concept in B(K) — the full
-    combined lattice — onto the two factor lattices. See
-    ``conceptflow.exploration.realized_pairs``, which checks this directly per
-    pair; it agrees with the join-closure of the atomic pairs
-    {(γ_outer(g), γ_inner(g)) : g ∈ G} used by ``debug_filled_pairs``.
-
-    Returns: outer concept stable_id → set of filled inner concept stable_ids.
-    """
-    result: dict[str, set[str]] = {}
-    for outer, inner in realized_pairs(outer_lattice, inner_lattice):
-        result.setdefault(outer.stable_id(), set()).add(inner.stable_id())
-    return result
-
-
 def debug_filled_pairs(view: ExplorationView) -> None:
     """
     Print a mathematical verification report of the subdirect product filling.
@@ -194,7 +176,7 @@ def debug_filled_pairs(view: ExplorationView) -> None:
     def fmt_int(ids, attr_names):
         return "{" + ", ".join(attr_names[i] for i in sorted(ids)) + "}" if ids else "∅"
 
-    # --- Reproduce _compute_filled_pairs with provenance tracking ---
+    # --- Reproduce the join-closure filling with provenance tracking ---
     def _lat_join(ext_by_id, concept_list, id1, id2):
         combined = ext_by_id[id1] | ext_by_id[id2]
         best = None
@@ -308,7 +290,7 @@ def debug_bottom_outer(view: ExplorationView) -> None:
          (equals 7 because φ: B(K) → B(K_outer) × B(K_inner) is injective)
 
     Also verifies that outer and inner contexts share the same object ordering —
-    required for the obj_idx pairing in _compute_filled_pairs to be correct.
+    required for the obj_idx pairing of the join-closure to be correct.
 
     Call this after building the ExplorationView tree but before or after
     plot_nested; it does not affect the diagram.
@@ -364,7 +346,7 @@ def debug_bottom_outer(view: ExplorationView) -> None:
     def fmt_int(ids, attr_names):
         return "{" + ", ".join(attr_names[i] for i in sorted(ids)) + "}" if ids else "∅"
 
-    # --- Reproduce _compute_filled_pairs with provenance tracking ---
+    # --- Reproduce the join-closure filling with provenance tracking ---
     def _lat_join(ext_by_id, concept_list, id1, id2):
         combined = ext_by_id[id1] | ext_by_id[id2]
         best = None
@@ -488,14 +470,52 @@ def exploration_view_to_nested_data(
 
     For N-layer depth, click-through nodes also carry has_child/child and
     filled_inner for the next layer.  These are matched from the per-concept
-    child view (built from the restricted object set) using intent-based lookup:
-    attribute indices are invariant across views built from the same scale, so
-    a concept's intent frozenset is a reliable cross-view key.
+    child view (built from the restricted object set) by intent, compared as
+    attribute names.
 
     ``timeout_ms`` is passed to every DimFlux layout. ``max_depth`` limits how
     many nesting levels below ``view`` are built (``None``: all); each level
     costs one DimFlux layout per expanded concept.
+
+    Every level reached by clicking through the nested diagram is part of
+    one nested line diagram of all the scales on the path: a node is filled
+    iff its combination of concepts (one per level) is the image of a concept
+    of the combined context, i.e. of the apposition of all these scales over
+    the objects of ``view``, and each object is labelled once, at the node of
+    its own object concepts. Only filled nodes can be entered. A concept whose
+    view has no inner template (its top concept was not expanded) opens its
+    child view as a separate diagram of that concept's objects.
     """
+    return _nested_data(view, object_label, timeout_ms, max_depth, ())
+
+
+def _fits_path(
+    objects: list[str], path: tuple[tuple[FormalContext, frozenset[str]], ...]
+) -> bool:
+    """
+    Whether ``objects`` have exactly the intent of every concept on ``path``.
+
+    ``path`` holds, for each level above, that level's context and the intent
+    (attribute names) of the concept clicked there. A combination of concepts,
+    one per level, is realized iff the objects having all their intents
+    (``objects``) have exactly the intent of each of them; for the levels below,
+    this is checked within the view, for the levels above, here.
+    """
+    for context, intent in path:
+        derived = context.object_derivation(objects)
+        if {context.attributes[j] for j in derived} != intent:
+            return False
+    return True
+
+
+def _nested_data(
+    view: ExplorationView,
+    object_label: Callable[[str], str] | None,
+    timeout_ms: int | None,
+    max_depth: int | None,
+    path: tuple[tuple[FormalContext, frozenset[str]], ...],
+) -> dict[str, Any]:
+    """``exploration_view_to_nested_data`` below the concepts on ``path``."""
     graph_data = lattice_to_graph_data_dimflux(
         view.lattice, stable_ids=True, timeout_ms=timeout_ms
     )
@@ -515,7 +535,9 @@ def exploration_view_to_nested_data(
     for attr_idx, cid in mu.items():
         by_concept_attrs[cid].append(view.context.attributes[attr_idx])
     for obj_idx, cid in gamma.items():
-        by_concept_objs[cid].append(view.context.objects[obj_idx])
+        name = view.context.objects[obj_idx]
+        if _fits_path([name], path):
+            by_concept_objs[cid].append(name)
 
     # Subdirect decomposition: shared inner template from the ⊤ outer concept.
     top_concept = view.lattice.top()
@@ -554,9 +576,14 @@ def exploration_view_to_nested_data(
                 f"but the following attributes appear in both: {sorted(overlap)}"
             )
 
-        filled_by_outer = _compute_filled_pairs(view.lattice, template_view.lattice)
+        filled_by_outer = {}
+        for outer, inner in realized_pairs(view.lattice, template_view.lattice):
+            common = [view.context.objects[g] for g in outer.extent & inner.extent]
+            if _fits_path(common, path):
+                filled_by_outer.setdefault(outer.stable_id(), set()).add(inner.stable_id())
 
     _fmt_obj = object_formatter(object_label)
+    concept_by_id = {c.stable_id(): c for c in view.lattice.concepts}
 
     nodes: list[dict[str, Any]] = []
 
@@ -585,13 +612,18 @@ def exploration_view_to_nested_data(
             # and the next-layer inner_template.
             per_concept_data: dict[str, Any] | None = None
             if per_concept_view is not None and (deeper is None or deeper >= 1):
-                per_concept_data = exploration_view_to_nested_data(
-                    per_concept_view, object_label, timeout_ms, deeper
+                intent = frozenset(
+                    view.context.attributes[j] for j in concept_by_id[node.node_id].intent
+                )
+                per_concept_data = _nested_data(
+                    per_concept_view, object_label, timeout_ms, deeper,
+                    (*path, (view.context, intent)),
                 )
 
-            # Intent-based lookup: attribute indices are invariant across views
-            # built from the same scale, so frozenset(intent indices) is a
-            # reliable cross-view key (stable_ids are derived from it too).
+            # Intent-based lookup by attribute names. The per-concept view may
+            # lack attributes of the template (e.g. a category absent among
+            # this concept's objects), so attribute indices and stable_ids can
+            # differ between the two views; the names cannot.
             pnode_by_intent: dict[frozenset, dict[str, Any]] = {}
             if per_concept_data is not None:
                 for pnode in per_concept_data["nodes"]:
@@ -608,7 +640,9 @@ def exploration_view_to_nested_data(
 
                 # Match to per-concept view node by intent.
                 pnode = pnode_by_intent.get(frozenset(inode["intent"]))
-                has_child = pnode is not None and pnode["has_child"]
+                # A hollow node contains no filled node at any level below,
+                # so it is not entered.
+                has_child = pnode is not None and pnode["has_child"] and iid in filled_set
                 child = pnode["child"] if has_child else None
                 pc_filled_inner = pnode["filled_inner"] if pnode is not None else []
 
@@ -661,8 +695,8 @@ def exploration_view_to_nested_data(
         if child_data is None and inner_template is None and max_depth != 0:
             child_view = view.children.get(node.node_id)
             if child_view is not None:
-                child_data = exploration_view_to_nested_data(
-                    child_view, object_label, timeout_ms, deeper
+                child_data = _nested_data(
+                    child_view, object_label, timeout_ms, deeper, ()
                 )
 
         nodes.append(

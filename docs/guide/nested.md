@@ -75,6 +75,18 @@ Many-valued data with missing values needs
 `ExplorationBuilder(..., missing="false")`; see
 [Conceptual scaling](scaling.md#missing-values).
 
+### Deeper levels
+
+Expand the child views again (`expand_all` on each of them) to nest a third
+scale, and so on. Clicking a node of the interactive diagram zooms into it,
+and every level you reach is part of one nested line diagram of all the
+scales on the way: a node is filled iff its combination of concepts, one per
+level, is a concept of the combined context, and each object is labelled
+once, at its own concepts. Hollow nodes contain nothing filled, so they
+cannot be entered. If a view's top concept was not expanded, clicking one of
+its concepts opens that concept's child view as a separate diagram of its
+objects.
+
 ## Static figures
 
 `backend="matplotlib"` and `backend="tikz"` draw the first nesting level as a

@@ -139,13 +139,14 @@ def test_line_diagram_page(open_page, case):
     assert "Extent" in page.inner_text("#conceptflow-details")
 
 
-def _three_level_view():
-    rng = np.random.default_rng(0)
-    df = pd.DataFrame({
-        "color": rng.choice(["red", "blue", "green"], 30),
-        "size": rng.uniform(0, 100, 30).round(),
-        "shape": rng.choice(["round", "square"], 30),
-    }, index=[f"item{i}" for i in range(30)])
+def _three_level_view(df=None):
+    if df is None:
+        rng = np.random.default_rng(0)
+        df = pd.DataFrame({
+            "color": rng.choice(["red", "blue", "green"], 30),
+            "size": rng.uniform(0, 100, 30).round(),
+            "shape": rng.choice(["round", "square"], 30),
+        }, index=[f"item{i}" for i in range(30)])
     builder = ExplorationBuilder(ManyValuedContext.from_dataframe(df))
     root = builder.root("color", [NominalScale("color")])
     builder.expand_all(root, scales=[ThresholdScale("size", [33, 66])])
@@ -198,6 +199,53 @@ def test_nested_page_navigation(open_page):
     # The small preview dots inside a bubble do not swallow the click.
     _click_centre(page, page.locator("circle.inner-node").first)
     assert page.inner_text("#conceptflow-breadcrumb") != crumb
+    assert errors == []
+
+
+_NODE_STATES = """() => [...document.querySelectorAll(
+    '#conceptflow-nested-svg g.node-group > circle')].map(c => {
+    const d = d3.select(c).datum();
+    return [c.getAttribute('class'), d.is_filled === true, d.has_child === true];
+})"""
+
+
+def _check_drawn_states(page):
+    """Each drawn node shows its data: entered iff it has a child, else filled/hollow."""
+    states = page.evaluate(_NODE_STATES)
+    for css, filled, has_child in states:
+        classes = set(css.split())
+        assert ("node-with-child" in classes) == has_child
+        assert has_child <= filled  # only filled nodes can be entered
+        if not has_child:
+            assert ("filled" in classes) == filled
+    return states
+
+
+def test_nested_levels_are_drawn_as_their_data(open_page):
+    # All green items are small, so "green and large" is hollow and must not
+    # be entered, although the green items' own view has a "large" concept.
+    df = pd.DataFrame({
+        "color": ["red", "red", "blue", "blue", "green", "green"],
+        "size": [10, 80, 50, 90, 10, 20],
+        "shape": ["round", "square", "round", "square", "round", "square"],
+    }, index=[f"item{i}" for i in range(6)])
+    page, errors = open_page(plot_nested(_three_level_view(df)).html)
+    outer = page.locator("#conceptflow-nested-svg g.node-group > circle.node-with-child")
+    seen = {"level 2": 0, "level 3": 0, "hollow": 0}
+    for i in range(outer.count()):
+        _click_centre(page, outer.nth(i))
+        states = _check_drawn_states(page)
+        seen["level 2"] += len(states)
+        seen["hollow"] += sum(not filled for _, filled, _ in states)
+        middle = page.locator("#conceptflow-nested-svg g.node-group > circle.node-with-child")
+        for j in range(middle.count()):
+            _click_centre(page, middle.nth(j))
+            seen["level 3"] += len(_check_drawn_states(page))
+            page.click("#conceptflow-back")
+            _wait_until_still(page)
+        page.click("#conceptflow-root")
+        _wait_until_still(page)
+    assert min(seen.values()) > 0, seen
     assert errors == []
 
 
