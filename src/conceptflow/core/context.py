@@ -67,6 +67,27 @@ def _cell_is_cross(value) -> bool:
         raise ValueError(f"Cannot read {value!r} as a cross or non-cross.") from None
 
 
+def _check_unique_names(names: tuple[str, ...], kind: str) -> None:
+    """
+    Raise if ``names`` (already strings) has duplicates, naming them. ``kind``
+    is "object" or "attribute"; DataFrames give their index or columns.
+    """
+    if len(set(names)) == len(names):
+        return
+    seen: set[str] = set()
+    duplicates = sorted({name for name in names if name in seen or seen.add(name)})
+    source = (
+        "its index: df.reset_index(drop=True) numbers the rows instead"
+        if kind == "object"
+        else "its columns"
+    )
+    raise ValueError(
+        f"{kind.capitalize()} names must be unique, but {duplicates[:5]} occur more "
+        f"than once (names are compared as strings, so 1 and '1' are the same). "
+        f"For a DataFrame, the {kind} names are {source}."
+    )
+
+
 def _cross_table(data) -> np.ndarray:
     """
     Convert incidence data to a boolean cross table, cell by cell:
@@ -144,11 +165,9 @@ class FormalContext:
         object.__setattr__(self, "objects", tuple(map(str, self.objects)))
         object.__setattr__(self, "attributes", tuple(map(str, self.attributes)))
 
-        if len(set(self.objects)) != len(self.objects):
-            raise ValueError("Object names must be unique.")
+        _check_unique_names(self.objects, "object")
 
-        if len(set(self.attributes)) != len(self.attributes):
-            raise ValueError("Attribute names must be unique.")
+        _check_unique_names(self.attributes, "attribute")
 
         incidence = _cross_table(self.incidence)
 
@@ -166,6 +185,12 @@ class FormalContext:
         # and cached lookups depend on it).
         incidence.flags.writeable = False
         object.__setattr__(self, "incidence", incidence)
+
+    def __setstate__(self, state: dict) -> None:
+        # pickle and copy.deepcopy restore the attributes without __post_init__,
+        # and an unpickled array is writeable again.
+        self.__dict__.update(state)
+        self.incidence.flags.writeable = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, FormalContext):

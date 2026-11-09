@@ -40,6 +40,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from conceptflow.core.context import _check_unique_names
+
 
 @dataclass(frozen=True)
 class ManyValuedContext:
@@ -79,11 +81,9 @@ class ManyValuedContext:
         objects = tuple(map(str, self.objects))
         attributes = tuple(map(str, self.attributes))
 
-        if len(set(objects)) != len(objects):
-            raise ValueError("Object names must be unique.")
+        _check_unique_names(objects, "object")
 
-        if len(set(attributes)) != len(attributes):
-            raise ValueError("Attribute names must be unique.")
+        _check_unique_names(attributes, "attribute")
 
         if isinstance(self.data, pd.DataFrame):
             data = self.data.copy()

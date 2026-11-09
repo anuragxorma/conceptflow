@@ -116,3 +116,33 @@ def test_validation():
         IncompleteContext(("g",), ("m",), [[True]], [[True]])
     with pytest.raises(ValueError, match="shape"):
         IncompleteContext(("g",), ("m",), [[True, False]], [[False]])
+
+
+def test_constructor_reads_cells_like_formal_context():
+    # np.array(..., dtype=bool) made "0" and NaN crosses: bool("0") is True.
+    row = np.array([["0", "1", np.nan]], dtype=object)
+    context = IncompleteContext(
+        ["g"], ["a", "b", "c"], certain=row, unknown=[[False, False, False]]
+    )
+    assert context.certain.tolist() == [[False, True, False]]
+    assert context.certain.tolist() == FormalContext(["g"], ["a", "b", "c"], row).incidence.tolist()
+    assert context.implication_status([], ["a"]) == "refuted"
+
+
+@pytest.mark.parametrize("copy_of", ["pickle", "deepcopy"])
+def test_copies_stay_read_only(copy_of):
+    import copy
+    import pickle
+
+    context = IncompleteContext(
+        ["g", "h"], ["a", "b"], certain=[[True, False], [False, False]],
+        unknown=[[False, True], [False, False]],
+    )
+    _ = context.possible  # cached, so it is copied too
+    copied = (
+        pickle.loads(pickle.dumps(context)) if copy_of == "pickle" else copy.deepcopy(context)
+    )
+    assert copied == context
+    for matrix in (copied.certain, copied.unknown, copied.possible, context.possible):
+        with pytest.raises(ValueError, match="read-only"):
+            matrix[0, 0] = not matrix[0, 0]

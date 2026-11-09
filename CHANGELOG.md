@@ -42,6 +42,16 @@
 - The nested diagram's check that the outer and inner views list the same
   objects in the same order is a `ValueError` instead of an `assert`, so it
   also runs under `python -O`.
+- `IncompleteContext(...)` reads its `certain` and `unknown` cells like
+  `FormalContext`, so `"0"` and NaN are not crosses. Before, they were
+  (`bool("0")` is True), and an implication could be reported valid that a
+  known absence refutes.
+- Contexts stay read-only after `pickle` and `copy.deepcopy` (as used by
+  joblib). Before, the incidence of a copy (and `IncompleteContext.possible`)
+  could be changed, which left cached results stale.
+- The error for duplicate object or attribute names says which names occur
+  twice and, for a DataFrame with a duplicate index, suggests
+  `reset_index(drop=True)`.
 
 ### Repository
 

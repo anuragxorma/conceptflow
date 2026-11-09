@@ -25,7 +25,12 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
-from conceptflow.core.context import FormalContext, _is_index
+from conceptflow.core.context import (
+    FormalContext,
+    _check_unique_names,
+    _cross_table,
+    _is_index,
+)
 
 UNKNOWN_MARKERS = frozenset({"?"})
 
@@ -116,23 +121,29 @@ class IncompleteContext:
         object.__setattr__(self, "objects", tuple(map(str, self.objects)))
         object.__setattr__(self, "attributes", tuple(map(str, self.attributes)))
 
-        if len(set(self.objects)) != len(self.objects):
-            raise ValueError("Object names must be unique.")
+        _check_unique_names(self.objects, "object")
 
-        if len(set(self.attributes)) != len(self.attributes):
-            raise ValueError("Attribute names must be unique.")
+        _check_unique_names(self.attributes, "attribute")
 
-        # Copies, read-only: the context cannot change after creation.
-        certain = np.array(self.certain, dtype=bool)
-        unknown = np.array(self.unknown, dtype=bool)
+        # Copies, read-only: the context cannot change after creation. Cells
+        # are read as in FormalContext, so "0" and NaN are not crosses.
+        certain = _cross_table(self.certain)
+        unknown = _cross_table(self.unknown)
         expected_shape = (len(self.objects), len(self.attributes))
 
         for name, matrix in (("certain", certain), ("unknown", unknown)):
+            if matrix.size == 0 and 0 in expected_shape:
+                continue
             if matrix.shape != expected_shape:
                 raise ValueError(
                     f"{name} matrix has shape {matrix.shape}, but expected "
                     f"{expected_shape}."
                 )
+
+        if certain.size == 0:
+            certain = np.zeros(expected_shape, dtype=bool)
+        if unknown.size == 0:
+            unknown = np.zeros(expected_shape, dtype=bool)
 
         if (certain & unknown).any():
             raise ValueError("An entry cannot be both certain and unknown.")
@@ -142,6 +153,14 @@ class IncompleteContext:
 
         object.__setattr__(self, "certain", certain)
         object.__setattr__(self, "unknown", unknown)
+
+    def __setstate__(self, state: dict) -> None:
+        # pickle and copy.deepcopy restore the attributes without __post_init__,
+        # and unpickled arrays are writeable again.
+        self.__dict__.update(state)
+        for name in ("certain", "unknown", "possible"):
+            if name in self.__dict__:
+                self.__dict__[name].flags.writeable = False
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, IncompleteContext):
@@ -181,7 +200,9 @@ class IncompleteContext:
     @cached_property
     def possible(self) -> np.ndarray:
         """True where the object has, or might have, the attribute."""
-        return self.certain | self.unknown
+        possible = self.certain | self.unknown
+        possible.flags.writeable = False  # cached, so it must not change
+        return possible
 
     @property
     def is_complete(self) -> bool:

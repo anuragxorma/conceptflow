@@ -88,3 +88,32 @@ def test_closure():
     ctx = FormalContext.from_array(data)
 
     assert ctx.closure([1]) == frozenset({0, 1})
+
+
+@pytest.mark.parametrize("copy_of", ["pickle", "deepcopy"])
+def test_copies_stay_read_only(copy_of):
+    # Unpickled arrays are writeable, and pickle and deepcopy skip
+    # __post_init__; a changed incidence would leave cached lattices stale.
+    import copy
+    import pickle
+
+    from conceptflow import ConceptLattice
+
+    context = FormalContext.from_array([[1, 0], [0, 1]])
+    lattice = ConceptLattice.from_context(context)
+    copies = (
+        [pickle.loads(pickle.dumps(context)), pickle.loads(pickle.dumps(lattice)).context]
+        if copy_of == "pickle"
+        else [copy.deepcopy(context), copy.deepcopy(lattice).context]
+    )
+    for copied in copies:
+        assert copied == context
+        with pytest.raises(ValueError, match="read-only"):
+            copied.incidence[0, 1] = True
+
+
+def test_duplicate_names_are_named_in_the_error():
+    with pytest.raises(ValueError, match=r"\['1'\] occur more than once.*reset_index"):
+        FormalContext.from_dataframe(pd.DataFrame([[1], [0]], index=[1, "1"], columns=["a"]))
+    with pytest.raises(ValueError, match=r"Attribute names .*\['a'\].*columns"):
+        FormalContext.from_dataframe(pd.DataFrame([[1, 0]], columns=["a", "a"]))
