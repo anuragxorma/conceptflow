@@ -42,6 +42,18 @@
 - The nested diagram's check that the outer and inner views list the same
   objects in the same order is a `ValueError` instead of an `assert`, so it
   also runs under `python -O`.
+- **Iceberg lattices are drawn with straight rows and upward edges.** After
+  a layout, nodes are moved sideways off edges they do not belong to; this
+  step assumed a single bottom concept and, for an iceberg lattice (which
+  has several minimal concepts), moved nodes along a tilted axis. Rows of
+  the layered layout broke and some edges pointed downwards, also with
+  `layout="dimflux"`.
+- `drawing_quality_scores` gives NaN for `vertical_axis_balance` on drawings
+  without a unique top and bottom element (iceberg lattices) and computes
+  the other scores, instead of raising.
+- The DimFlux layout of an iceberg lattice warns when the full lattice of
+  the context, which DimFlux lays out, is large; it could run for many
+  minutes without a warning. `timeout_ms` accepts NumPy integers.
 - `IncompleteContext(...)` reads its `certain` and `unknown` cells like
   `FormalContext`, so `"0"` and NaN are not crosses. Before, they were
   (`bool("0")` is True), and an implication could be reported valid that a

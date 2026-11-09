@@ -339,3 +339,17 @@ def test_graph_data_is_scored_as_drawn():
     # slightly different layouts on slower machines.)
     assert abs(drawn[frozenset(top.metadata["extent"])][0]
                - drawn[frozenset(bottom.metadata["extent"])][0]) < 1e-6
+
+
+def test_all_scores_of_an_iceberg_lattice():
+    # drawing_quality_scores raised for iceberg lattices because of the one
+    # score that needs a unique top and bottom element.
+    from conceptflow.datasets import load_context
+
+    lattice = ConceptLattice.from_context(load_context("livingbeings_en"), min_support=3)
+    graph_data = layered_layout(lattice_to_graph_data(lattice))
+    scores = drawing_quality_scores(graph_data, worst_case=True)
+    assert math.isnan(scores.pop("vertical_axis_balance"))
+    assert all(0.0 <= value <= 1.0 for value in scores.values())
+    with pytest.raises(ValueError, match="unique top and bottom"):
+        vertical_axis_balance_score(graph_data)

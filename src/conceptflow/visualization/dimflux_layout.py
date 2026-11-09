@@ -10,6 +10,7 @@ Additive Line Diagrams" (2026), arXiv:2603.16366.
 
 from __future__ import annotations
 
+import numbers
 import os
 import warnings
 from dataclasses import replace
@@ -40,6 +41,17 @@ def _sanitized_dataframe(context: FormalContext) -> pd.DataFrame:
         index=[f"g{i}" for i in range(context.n_objects)],
         columns=[f"m{j}" for j in range(context.n_attributes)],
     )
+
+
+def _full_lattice_is_slow(context: FormalContext) -> bool:
+    """Whether the full lattice of ``context`` is too large for a quick DimFlux layout."""
+    from conceptflow.algorithms.enumeration import ConceptLimitExceeded
+
+    try:
+        ConceptLattice.from_context(context, max_concepts=DIMFLUX_SLOW_LATTICE_SIZE)
+    except ConceptLimitExceeded:
+        return True
+    return False
 
 
 def _dimflux_coordinates(
@@ -115,14 +127,26 @@ def lattice_to_graph_data_dimflux(
         much longer.
     """
     if timeout_ms is not None and (
-        isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or timeout_ms < 0
+        isinstance(timeout_ms, bool)
+        or not isinstance(timeout_ms, numbers.Integral)
+        or timeout_ms < 0
     ):
         raise ValueError("timeout_ms must be None or a non-negative integer.")
+    if timeout_ms is not None:
+        timeout_ms = int(timeout_ms)
 
     if lattice.n_concepts > DIMFLUX_SLOW_LATTICE_SIZE:
         warnings.warn(
             f"DimFlux layout of {lattice.n_concepts} concepts may take several "
             'minutes. For large lattices, layout="none" is much faster.',
+            skip_file_prefixes=(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),),
+        )
+    elif lattice.is_iceberg and _full_lattice_is_slow(lattice.context):
+        warnings.warn(
+            f"DimFlux lays out the full concept lattice of the context (more than "
+            f"{DIMFLUX_SLOW_LATTICE_SIZE} concepts), not only the {lattice.n_concepts} "
+            "concepts of this iceberg lattice, so it may take several minutes. "
+            'layout="none" is much faster.',
             skip_file_prefixes=(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),),
         )
 

@@ -79,7 +79,8 @@ print(round(node_node_conflict_score(layered, threshold_factor=1.0), 2))  # 0.8
 ## Limits
 
 - `vertical_axis_balance_score` needs a unique top and bottom element, so it
-  raises `ValueError` for iceberg lattices.
+  raises `ValueError` for iceberg lattices; `drawing_quality_scores` gives
+  NaN for it there and computes the other scores.
 - The metrics score the geometry only: labels are not part of a drawing
   here, so label overlaps are not measured.
 - Scores are not invariant to every change: `edge_length_uniformity_score`

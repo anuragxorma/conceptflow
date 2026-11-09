@@ -14,7 +14,7 @@ from dataclasses import replace
 import numpy as np
 from scipy.spatial import cKDTree
 
-from conceptflow.visualization.graph_data import GraphData
+from conceptflow.visualization.graph_data import GraphData, needs_rotation
 
 # How close an edge may come to a node it does not connect, as a fraction of
 # the smallest distance between two nodes. Interactive diagrams draw nodes
@@ -25,7 +25,17 @@ MAX_NODES = 2000  # above this a line diagram is too dense to read node by node
 
 
 def _up_axis(graph_data: GraphData, xy: np.ndarray) -> np.ndarray:
-    """Unit vector from the bottom concept to the top concept."""
+    """
+    Unit vector pointing up in the drawing as it is shown.
+
+    A drawing that is shown as it is (a layered layout, or an iceberg
+    lattice, which has no single bottom concept) is upright on the screen,
+    where y grows downwards. Any other drawing is rotated so that its top
+    concept is straight above its bottom concept, so up is from the bottom
+    to the top concept.
+    """
+    if not needs_rotation(graph_data):
+        return np.array([0.0, -1.0])
     sizes = [node.metadata.get("extent_size", 0) for node in graph_data.nodes]
     top, bottom = int(np.argmax(sizes)), int(np.argmin(sizes))
     up = xy[top] - xy[bottom]
@@ -53,8 +63,9 @@ def keep_edges_off_nodes(graph_data: GraphData, clearance: float = CLEARANCE) ->
     Move nodes sideways until no edge passes closer than ``clearance`` times
     the smallest node distance to a node it does not connect.
 
-    "Sideways" is perpendicular to the line from the bottom to the top
-    concept, so every concept keeps its height and edges keep pointing up. A
+    "Sideways" is perpendicular to the up direction of the drawing as it is
+    shown (see ``_up_axis``), so every concept keeps its height and edges
+    keep pointing up. A
     node is only moved where it keeps at least the smallest node distance to
     every other node, so the drawing does not get denser. Lattices above
     ``MAX_NODES`` concepts are returned unchanged.

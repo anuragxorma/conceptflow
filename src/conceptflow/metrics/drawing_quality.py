@@ -820,6 +820,14 @@ def _ratio_balance(left: float, right: float) -> float:
     return float(1.0 - abs(left - right) / total)
 
 
+def _maximal_and_minimal(drawing: _Drawing) -> tuple[list[int], list[int]]:
+    """The nodes without upper covers, and those without lower covers."""
+    graph = drawing.graph
+    tops = [x for x in graph.nodes if graph.out_degree(x) == 0]
+    bottoms = [x for x in graph.nodes if graph.in_degree(x) == 0]
+    return tops, bottoms
+
+
 def vertical_axis_balance_score(drawing) -> float:
     """
     Left-right balance around the vertical line through the top element.
@@ -832,9 +840,7 @@ def vertical_axis_balance_score(drawing) -> float:
     Needs a unique top and bottom element, so not iceberg lattices.
     """
     drawing = _check_drawing(drawing)
-    graph = drawing.graph
-    tops = [x for x in graph.nodes if graph.out_degree(x) == 0]
-    bottoms = [x for x in graph.nodes if graph.in_degree(x) == 0]
+    tops, bottoms = _maximal_and_minimal(drawing)
     if len(tops) != 1 or len(bottoms) != 1:
         raise ValueError(
             "vertical_axis_balance_score needs a unique top and bottom element, "
@@ -895,9 +901,17 @@ def drawing_quality_scores(drawing, *, worst_case: bool = False) -> dict[str, fl
     metrics that average over nodes, vertices or crossings: the worst single
     term, on the same scale. The structures the metrics share are computed
     only once.
+
+    ``"vertical_axis_balance"`` is NaN for a drawing without a unique top and
+    bottom element (an iceberg lattice), where it is not defined.
     """
     drawing = _check_drawing(drawing)
-    scores = {name: metric(drawing) for name, metric in _SCORES.items()}
+    tops, bottoms = _maximal_and_minimal(drawing)
+    has_axis = len(tops) == 1 and len(bottoms) == 1
+    scores = {
+        name: float("nan") if name == "vertical_axis_balance" and not has_axis else metric(drawing)
+        for name, metric in _SCORES.items()
+    }
     if worst_case:
         for name in _WORST_CASE_SCORES:
             scores[f"{name}_min"] = _SCORES[name](drawing, aggregate="min")

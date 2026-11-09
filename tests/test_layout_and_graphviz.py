@@ -191,3 +191,41 @@ def test_layout_positions_are_keyed_by_extent_and_upright(layout):
         plot_lattice(ConceptLattice.from_context(scale), backend="graph_data", layout=layout)
     )
     assert set(coarse) <= set(positions)
+
+
+def _rows_and_upward_edges(graph_data):
+    """Distinct heights, and whether every cover edge points up on screen."""
+    nodes = graph_data.node_map()
+    upward = all(nodes[e.target].y < nodes[e.source].y for e in graph_data.edges)
+    return {round(node.y, 6) for node in graph_data.nodes}, upward
+
+
+@pytest.mark.parametrize(
+    "context, min_support",
+    [
+        (
+            FormalContext.from_array(
+                np.array([[0, 1, 0, 1], [1, 0, 0, 0], [1, 1, 0, 1], [1, 1, 1, 1], [0, 1, 1, 0]])
+            ),
+            2,
+        ),
+        ("tealady", 0.1),
+        ("binary_relations_en", 0.1),
+    ],
+)
+def test_layered_iceberg_lattices_keep_their_rows(context, min_support):
+    # An iceberg lattice has several minimal concepts; moving nodes off edges
+    # must still move them horizontally, so rows stay rows and edges point up.
+    from conceptflow.datasets import load_context
+
+    if isinstance(context, str):
+        context = load_context(context)
+    lattice = ConceptLattice.from_context(context, min_support=min_support)
+    graph_data = layered_layout(lattice_to_graph_data(lattice))
+    heights, upward = _rows_and_upward_edges(graph_data)
+    assert upward
+    # Every concept sits on a row: the heights are evenly spaced.
+    heights = sorted(heights)
+    gaps = {round(b - a, 6) for a, b in zip(heights, heights[1:])}
+    assert len(gaps) <= 1
+
