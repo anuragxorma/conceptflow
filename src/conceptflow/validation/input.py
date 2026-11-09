@@ -119,9 +119,44 @@ def input_feature_names(X) -> tuple[str, ...] | None:
     return None
 
 
+def has_string_feature_names(X) -> bool:
+    """
+    Whether scikit-learn would see feature names in ``X``: a DataFrame has
+    them only if all its column names are strings (integer column names are
+    taken as positions, e.g. by a ColumnTransformer). A FormalContext always
+    has them.
+    """
+    if isinstance(X, pd.DataFrame):
+        return all(isinstance(column, str) for column in X.columns)
+    return isinstance(X, FormalContext)
+
+
 def remember_feature_names(estimator, X) -> None:
     """At fit time: remember the column names of named input."""
     estimator._fit_feature_names = input_feature_names(X)
+    estimator._input_features_by_name = has_string_feature_names(X)
+
+
+def check_input_features(estimator, input_features) -> None:
+    """
+    ``get_feature_names_out(input_features)``, as in scikit-learn: after a fit
+    on input with string column names, ``input_features`` must be those
+    names; otherwise (an array, or integer column names) any names of the
+    right length are accepted, such as those a previous Pipeline step or a
+    ColumnTransformer passes on.
+    """
+    if input_features is None:
+        return
+    input_features = tuple(map(str, input_features))
+    fitted = getattr(estimator, "_fit_feature_names", None)
+    if fitted is not None and getattr(estimator, "_input_features_by_name", True):
+        if input_features != tuple(fitted):
+            raise ValueError("input_features is not equal to feature_names_in_.")
+    elif len(input_features) != estimator.n_features_in_:
+        raise ValueError(
+            f"input_features should have length equal to number of features "
+            f"({estimator.n_features_in_}), got {len(input_features)}."
+        )
 
 
 def check_feature_names(estimator, X) -> None:

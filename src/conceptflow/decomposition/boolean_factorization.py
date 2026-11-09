@@ -35,7 +35,11 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.algorithms._membership import contains_sets
 from conceptflow.core import Concept
 from conceptflow.validation import check_binary_context_input
-from conceptflow.validation.input import check_feature_names, remember_feature_names
+from conceptflow.validation.input import (
+    check_feature_names,
+    check_input_features,
+    remember_feature_names,
+)
 
 
 def _counting_dtype(n_cells: int):
@@ -95,6 +99,17 @@ class _BooleanFactorization(ClassNamePrefixFeaturesOutMixin, TransformerMixin, B
             return np.zeros((usage.shape[0], self.components_.shape[1]), dtype=bool)
         dtype = _counting_dtype(usage.size)
         return (usage.astype(dtype) @ self.components_.astype(dtype)) > 0
+
+    def get_feature_names_out(self, input_features=None):
+        """
+        Output feature names: the class name and the factor number, e.g.
+        ``grecond0``. ``input_features`` must be the names seen during fit, if
+        the input had names; otherwise any names of the right length are
+        accepted, such as those a previous Pipeline step passes on.
+        """
+        check_is_fitted(self, "_n_features_out")
+        check_input_features(self, input_features)
+        return super().get_feature_names_out()
 
     def transform(self, X):
         """

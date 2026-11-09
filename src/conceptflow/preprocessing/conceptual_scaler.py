@@ -18,6 +18,7 @@ from sklearn.utils.validation import check_is_fitted
 from conceptflow.core import FormalContext, IncompleteContext, ManyValuedContext
 from conceptflow.core.incomplete_context import is_missing
 from conceptflow.preprocessing.scales import Scale, UnknownValueError
+from conceptflow.validation.input import check_input_features, has_string_feature_names
 
 
 class ConceptualScaler(TransformerMixin, BaseEstimator):
@@ -120,6 +121,13 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
 
         self.input_context_ = mvc
         self.scales_ = scales
+        # input_features is checked by name only after a fit on a
+        # ManyValuedContext or a DataFrame with string column names (as in
+        # scikit-learn).
+        self._fit_feature_names = mvc.attributes
+        self._input_features_by_name = isinstance(
+            X, ManyValuedContext
+        ) or has_string_feature_names(X)
         self.feature_names_in_ = mvc.attributes
         self.n_features_in_ = mvc.n_attributes
         self.object_names_in_ = mvc.objects
@@ -406,13 +414,5 @@ class ConceptualScaler(TransformerMixin, BaseEstimator):
         Return output feature names for the scaled binary attributes.
         """
         check_is_fitted(self, "scaled_attributes_")
-
-        if input_features is not None:
-            input_features = tuple(map(str, input_features))
-
-            if input_features != tuple(self.feature_names_in_):
-                raise ValueError(
-                    "input_features does not match feature_names_in_."
-                )
-
+        check_input_features(self, input_features)
         return pd.Index(self.scaled_attributes_, dtype="object").to_numpy()

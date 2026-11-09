@@ -49,6 +49,13 @@
 - Contexts stay read-only after `pickle` and `copy.deepcopy` (as used by
   joblib). Before, the incidence of a copy (and `IncompleteContext.possible`)
   could be changed, which left cached results stale.
+- `get_feature_names_out` works in Pipelines and ColumnTransformers after a
+  step that returns arrays, e.g. `make_pipeline(ConceptualScaler(...),
+  GreConD())`: as in scikit-learn, `input_features` must equal the column
+  names seen during fit only if those were strings; after a fit on an
+  array or on integer column names, any names of the right length are
+  accepted. Integer column names are still attribute names, and are still
+  checked for order in `transform`.
 - The error for duplicate object or attribute names says which names occur
   twice and, for a DataFrame with a duplicate index, suggests
   `reset_index(drop=True)`.
