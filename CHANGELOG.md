@@ -93,6 +93,11 @@
   datasets (`conceptflow.datasets`) are unaffected.
 - `examples/closebyone_lattice.py` is merged into `examples/basic_lattice.py`;
   the examples no longer pass `include_bottom`, which has no effect.
+- The package metadata gives the licence as the SPDX expression
+  `BSD-3-Clause` (building needs setuptools 77 or newer); the old form is
+  deprecated and setuptools stops accepting it in 2027.
+- Dependabot opens monthly pull requests that update the GitHub Actions
+  used by the workflows.
 
 ### Documentation
 
