@@ -40,7 +40,10 @@ DIAMOND = [("0", "a"), ("0", "b"), ("a", "1"), ("b", "1")]
 SQUARE = {"0": (0, 0), "a": (-1, 1), "b": (1, 1), "1": (0, 2)}
 
 # Two drawings of the reference implementation's data set (dataset m4,
-# lattices 66 and 64) with their published scores.
+# lattices 66 and 64) with their published scores. The edge crossing scores
+# are not the published ones: the reference implementation left out pairs of
+# edges with any comparable endpoints, ConceptFlow follows the paper's
+# definition (see test_edge_crossing_score_matches_its_definition).
 REDRAW_66 = drawing(
     [
         ("1", "0"),
@@ -77,7 +80,7 @@ REDRAW_66_SCORES = {
     "node_edge_conflict": 0.8131928679416219,
     "crossing_angle": 0.667660773810441,
     "edge_edge_conflict": 0.992660403292987,
-    "edge_crossing": 0.4444444444444444,
+    "edge_crossing": 0.819672131147541,
     "edge_length_uniformity": 0.9565441359162923,
     "layer_consistency": 0.9459288325011164,
     "slope_economy": 0.21428571428571427,
@@ -127,7 +130,7 @@ SUGIYAMA_64_SCORES = {
     "node_edge_conflict": 0.6511959798862832,
     "crossing_angle": 0.47073817647155236,
     "edge_edge_conflict": 0.7777777777777778,
-    "edge_crossing": 0.8333333333333334,
+    "edge_crossing": 0.8444444444444444,
     "edge_length_uniformity": 0.8525669465384754,
     "layer_consistency": 0.9519230769230769,
     "slope_economy": 0.6,
@@ -254,6 +257,93 @@ def test_crossings():
         [("a", "b"), ("c", "d")], {"a": (0, 0), "b": (0, 2), "c": (1e-9, 1), "d": (2, 3)}
     )
     assert edge_crossing_score(graph) == 1.0
+
+
+
+def test_crossing_of_edges_with_some_comparable_endpoints_counts():
+    # 0 < a, c; a < b, d; c < d; b, d < 1. The edges a-b and c-d cross, and
+    # a < d, so only some of their endpoints are comparable.
+    edges = [("0", "a"), ("0", "c"), ("a", "b"), ("c", "d"), ("a", "d"), ("b", "1"), ("d", "1")]
+    crossing = drawing(
+        edges, {"0": (0, 0), "a": (-1, 1), "c": (1, 1), "b": (1, 2), "d": (-1, 2), "1": (0, 3)}
+    )
+    free = drawing(
+        edges, {"0": (0, 0), "a": (-1, 1), "c": (1, 1), "b": (-2, 2), "d": (0, 2), "1": (0, 3)}
+    )
+    # Possible crossings: 21 pairs of edges - 10 sharing an endpoint - 3 with
+    # one edge entirely below the other (0-a below b-1 and d-1, 0-c below d-1).
+    assert edge_crossing_score(crossing) == pytest.approx(1 - 1 / 8)
+    assert edge_crossing_score(free) == 1.0
+
+
+def _paper_edge_crossing_score(edges, positions):
+    """
+    The paper's edge crossing score, computed independently: every pair of
+    edges, comparability from paths, intersections in exact arithmetic.
+    """
+    from fractions import Fraction
+    from itertools import combinations
+
+    graph = nx.DiGraph(edges)
+    reach = {v: nx.descendants(graph, v) | nx.ancestors(graph, v) | {v} for v in graph}
+    point = {v: tuple(map(Fraction, positions[v])) for v in graph}
+
+    def orient(p, q, r):
+        value = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        return (value > 0) - (value < 0)
+
+    def on_segment(p, q, r):  # r on the closed segment p-q, given collinear
+        return min(p[0], q[0]) <= r[0] <= max(p[0], q[0]) and min(p[1], q[1]) <= r[1] <= max(
+            p[1], q[1]
+        )
+
+    def intersect(e, f):
+        p, q, r, s = point[e[0]], point[e[1]], point[f[0]], point[f[1]]
+        o1, o2, o3, o4 = orient(p, q, r), orient(p, q, s), orient(r, s, p), orient(r, s, q)
+        if o1 != o2 and o3 != o4:
+            return True
+        return (
+            (o1 == 0 and on_segment(p, q, r))
+            or (o2 == 0 and on_segment(p, q, s))
+            or (o3 == 0 and on_segment(r, s, p))
+            or (o4 == 0 and on_segment(r, s, q))
+        )
+
+    pairs = list(combinations(list(graph.edges), 2))
+    x_deg = sum(1 for e, f in pairs if set(e) & set(f))
+    x_comp = sum(
+        1
+        for e, f in pairs
+        if not set(e) & set(f)
+        and all(b in reach[a] for a, b in combinations([*e, *f], 2))
+    )
+    x_max = len(pairs) - x_deg - x_comp
+    crossings = sum(1 for e, f in pairs if not set(e) & set(f) and intersect(e, f))
+    return 1.0 if x_max == 0 else max(0.0, 1 - crossings / x_max)
+
+
+@pytest.mark.parametrize("seed", range(60))
+def test_edge_crossing_score_matches_its_definition(seed):
+    rng = np.random.default_rng(seed)
+    n = int(rng.integers(4, 10))
+    if seed % 2:
+        # The cover edges of a lattice.
+        graph = laid_out_lattice(seed)
+        edges = [(edge.source, edge.target) for edge in graph.edges]
+        nodes = graph.node_ids()
+    else:
+        # Any order, with edges that are not covers.
+        edges = [(i, j) for i in range(n) for j in range(i + 1, n) if rng.random() < 0.4]
+        nodes = list(range(n))
+    # Distinct points of a small grid, not necessarily upward: many collinear
+    # points, touching and overlapping edges, and crossings of comparable pairs.
+    side = max(5, math.isqrt(len(nodes) - 1) + 1)
+    cells = rng.choice(side * side, size=len(nodes), replace=False)
+    positions = {v: (int(c % side), int(c // side)) for v, c in zip(nodes, cells)}
+    if not edges:
+        return
+    expected = _paper_edge_crossing_score(edges, positions)
+    assert edge_crossing_score(drawing(edges, positions)) == pytest.approx(expected)
 
 
 def test_coincident_nodes_and_node_on_edge():

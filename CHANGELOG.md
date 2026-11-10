@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`edge_crossing_score` left out most crossings; its values change.** It
+  follows the definition of the drawing-quality paper now:
+  `1 - |X| / X_max` with `X_max = C(|E|, 2) - X_deg - X_comp`, where
+  `X_deg` counts the pairs of edges that share an endpoint and `X_comp` the
+  other pairs whose four endpoints are pairwise comparable (for cover edges:
+  one edge entirely below the other, so they cannot cross in an upward
+  drawing). Before, pairs with *any* comparable endpoints were left out of
+  both the bound and the count, although such edges can cross, so drawings
+  with visible crossings could score 1.0: livingbeings drawn by DimFlux now
+  scores 0.986 instead of 1.0. Scores computed with 0.6.0 or 0.6.1, and
+  with the original implementation the metrics were ported from, differ;
+  recompute them to compare with new ones.
+
 ## 0.6.1 (2026-11-10)
 
 Fixes only, no new features. The main ones: the third and deeper levels

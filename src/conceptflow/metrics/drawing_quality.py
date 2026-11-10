@@ -511,11 +511,22 @@ def edge_crossing_score(drawing) -> float:
     """
     ``1 - crossings / possible crossings``.
 
-    Two edges can cross in some upward drawing only if all four endpoints are
-    pairwise incomparable; other pairs are joined by monotone paths and never
-    need to cross. Only those pairs are counted, so the score measures how
-    much of the avoidable crossing budget the drawing spends. 1.0 if no pair
-    of edges could cross (a chain, for example).
+    Following Purchase's crossing score with a bound tightened for order
+    diagrams, ``1 - |X| / X_max`` with
+    ``X_max = C(|E|, 2) - X_deg - X_comp``:
+
+    - ``|X|`` is the number of pairs of edges that cross (also touching or
+      overlapping) without sharing an endpoint;
+    - ``X_deg`` is the number of pairs of edges that share an endpoint;
+    - ``X_comp`` is the number of the other pairs whose four endpoints are
+      pairwise comparable. For cover edges these are the pairs with one edge
+      entirely below the other, which cannot cross in an upward drawing.
+
+    Pairs of edges with only some endpoints comparable can cross and are
+    counted. 1.0 if no pair of edges could cross (a chain, for example). A
+    drawing that is not upward can also have crossings between pairs counted
+    in ``X_comp``; they count as crossings too, and the score is then clipped
+    at 0.
     """
     drawing = _check_drawing(drawing)
     edges = drawing.edges
@@ -532,28 +543,28 @@ def edge_crossing_score(drawing) -> float:
     chunk = max(1, _CHUNK_CELLS // len(edges))
     for first in range(0, len(edges), chunk):
         block = slice(first, first + chunk)
-        # Comparability is reflexive, so this also blocks shared endpoints.
-        blocked = (
+        shared = (
+            (lower[block, None] == lower[None, :])
+            | (lower[block, None] == upper[None, :])
+            | (upper[block, None] == lower[None, :])
+            | (upper[block, None] == upper[None, :])
+        )
+        # The endpoints of one edge are comparable (u < v), so all four are
+        # pairwise comparable iff every endpoint of one edge is comparable
+        # with every endpoint of the other.
+        all_comparable = (
             comparable[np.ix_(lower[block], lower)]
-            | comparable[np.ix_(lower[block], upper)]
-            | comparable[np.ix_(upper[block], lower)]
-            | comparable[np.ix_(upper[block], upper)]
+            & comparable[np.ix_(lower[block], upper)]
+            & comparable[np.ix_(upper[block], lower)]
+            & comparable[np.ix_(upper[block], upper)]
         )
         # Count each unordered pair once: row k of the block is edge first + k.
-        possible += int(np.triu(~blocked, k=first + 1).sum())
+        possible += int(np.triu(~(shared | all_comparable), k=first + 1).sum())
     if possible == 0:
         return 1.0
 
-    # Crossings between comparable edges are not valid upward drawings at
-    # all; they are left out of both counts.
-    i, j, _ = drawing.crossings
-    free = ~(
-        comparable[lower[i], lower[j]]
-        | comparable[lower[i], upper[j]]
-        | comparable[upper[i], lower[j]]
-        | comparable[upper[i], upper[j]]
-    )
-    return float(1.0 - int(free.sum()) / possible)
+    crossings = len(drawing.crossings[0])
+    return float(max(0.0, 1.0 - crossings / possible))
 
 
 def _crossing_angles(drawing: _Drawing) -> np.ndarray:

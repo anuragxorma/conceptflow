@@ -81,6 +81,11 @@ print(round(node_node_conflict_score(layered, threshold_factor=1.0), 2))  # 0.8
 - `vertical_axis_balance_score` needs a unique top and bottom element, so it
   raises `ValueError` for iceberg lattices; `drawing_quality_scores` gives
   NaN for it there and computes the other scores.
+- `edge_crossing_score` counts every crossing, relative to the pairs of
+  edges that could cross: pairs sharing an endpoint, and pairs with one edge
+  entirely below the other, are not counted as possible crossings. Its
+  values from ConceptFlow 0.6.0 and 0.6.1, which left out more pairs, are
+  not comparable with later ones.
 - The metrics score the geometry only: labels are not part of a drawing
   here, so label overlaps are not measured.
 - Scores are not invariant to every change: `edge_length_uniformity_score`
