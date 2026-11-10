@@ -105,6 +105,8 @@
   expanding a concept again replaces its child view;
   `scale_measure_problems` says how to compare a scale whose objects are in
   another order.
+- The benchmarks are measured again with 0.6.1: the same times as 0.4.0,
+  and the same counts as fcapy and concepts wherever they finish.
 
 ## 0.6.0 (2026-10-30)
 
