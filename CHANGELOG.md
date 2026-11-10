@@ -71,6 +71,15 @@
 - The error for duplicate object or attribute names says which names occur
   twice and, for a DataFrame with a duplicate index, suggests
   `reset_index(drop=True)`.
+- In the interactive nested diagram, the details of a node inside an outer
+  concept list the objects of both concepts. Before, they listed the inner
+  concept's objects among all objects.
+- Smaller fixes: `exploration_view_to_nested_data` checks `max_depth`; the
+  nested diagram data no longer changes order from run to run; the
+  `write()` methods of TikZ and Graphviz figures expand `~`; Graphviz shows
+  newlines and tabs in names as spaces instead of dropping them; and a
+  `\sqrt{...}` whose argument LaTeX math cannot take stays text in TikZ
+  labels instead of breaking the document.
 
 ### Repository
 

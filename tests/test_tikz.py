@@ -71,3 +71,32 @@ def test_nested_tikz_structure():
 def test_nested_tikz_compiles(tmp_path):
     fig = plot_nested(make_nested_view(), backend="tikz", show_object_labels=True)
     assert fig.write(tmp_path / "n.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_square_root_of_text_that_is_not_math_stays_text():
+    from conceptflow.visualization.tikz import latex_label
+
+    assert latex_label(r"\sqrt{3}") == r"$\sqrt{3}$"
+    assert latex_label(r"\sqrt{\alpha}") == r"$\sqrt{\alpha}$"
+    # & % # $ and unknown commands cannot go into math mode as they are.
+    assert latex_label(r"\sqrt{a&b}") == r"\textbackslash{}sqrt\{a\&b\}"
+    assert latex_label(r"\sqrt{\foo} and \sqrt{2}") == (
+        r"\textbackslash{}sqrt\{\textbackslash{}foo\} and $\sqrt{2}$"
+    )
+
+
+@needs_latex
+def test_names_with_square_roots_of_text_compile(tmp_path):
+    names = [r"\sqrt{a&b}", r"\sqrt{a%b}", r"\sqrt{a#b}", r"\sqrt{\foo}", r"\sqrt{a$b}"]
+    context = FormalContext.from_array(np.eye(len(names)), objects=names, attributes=names)
+    lattice = ConceptLattice.from_context(context)
+    figure = plot_lattice(lattice, backend="tikz", layout="layered")
+    assert figure.write(tmp_path / "f.pdf").exists()
+
+
+def test_write_expands_the_home_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows
+    written = plot_lattice(make_lattice(), backend="tikz", layout="layered").write("~/out/f.tex")
+    assert written == tmp_path / "out" / "f.tex"
+    assert written.exists()

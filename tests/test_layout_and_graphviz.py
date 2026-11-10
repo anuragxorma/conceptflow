@@ -229,3 +229,22 @@ def test_layered_iceberg_lattices_keep_their_rows(context, min_support):
     gaps = {round(b - a, 6) for a, b in zip(heights, heights[1:])}
     assert len(gaps) <= 1
 
+
+def test_graphviz_keeps_whitespace_in_names_as_spaces():
+    # Newlines and tabs vanished in Graphviz's HTML-like labels: "a\nb" was
+    # drawn as "ab".
+    context = FormalContext.from_array(
+        np.array([[1, 0], [0, 1]]), objects=["a\nb", "tab\tx"], attributes=["m\nn", "k"]
+    )
+    source = lattice_to_dot(ConceptLattice.from_context(context))
+    for name in ("a b", "tab x", "m n"):
+        assert name in source
+
+
+def test_graphviz_write_expands_the_home_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows
+    figure = plot_lattice(random_lattice(0), backend="graphviz", layout="layered")
+    written = figure.write("~/out/f.dot")
+    assert written == tmp_path / "out" / "f.dot"
+    assert written.exists()

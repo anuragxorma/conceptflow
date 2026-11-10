@@ -31,7 +31,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from numbers import Integral
 from typing import TYPE_CHECKING, Any
+
+from sklearn.utils import check_scalar
 
 from conceptflow._deprecation import warn_deprecated
 from conceptflow.exploration.combinations import realized_pairs
@@ -486,6 +489,8 @@ def exploration_view_to_nested_data(
     view has no inner template (its top concept was not expanded) opens its
     child view as a separate diagram of that concept's objects.
     """
+    if max_depth is not None:
+        check_scalar(max_depth, "max_depth", Integral, min_val=0)
     return _nested_data(view, object_label, timeout_ms, max_depth, ())
 
 
@@ -593,7 +598,7 @@ def _nested_data(
 
         # Filled inner nodes: those whose coordinate pair (this outer concept,
         # inner concept) lies in the subdirect product of B(K).
-        filled_inner = list(filled_by_outer.get(node.node_id, set()))
+        filled_inner = sorted(filled_by_outer.get(node.node_id, set()))
 
         # Build click-through child view for this concept.
         #
@@ -630,6 +635,10 @@ def _nested_data(
                 for pnode in per_concept_data["nodes"]:
                     pnode_by_intent[frozenset(pnode["metadata"]["intent"])] = pnode
 
+            # A node inside this outer concept stands for the objects of both:
+            # the template's extent covers all objects of the view.
+            outer_extent = set(node.metadata["extent"])
+
             child_nodes: list[dict[str, Any]] = []
             for inode in inner_template["nodes"]:
                 iid = inode["id"]
@@ -646,6 +655,7 @@ def _nested_data(
                 has_child = pnode is not None and pnode["has_child"] and iid in filled_set
                 child = pnode["child"] if has_child else None
                 pc_filled_inner = pnode["filled_inner"] if pnode is not None else []
+                extent = sorted(outer_extent.intersection(inode["extent"]))
 
                 child_nodes.append({
                     "id": iid,
@@ -660,8 +670,8 @@ def _nested_data(
                     "has_child": has_child,
                     "child": child,
                     "metadata": {
-                        "extent": inode["extent"],
-                        "extent_size": inode["extent_size"],
+                        "extent": extent,
+                        "extent_size": len(extent),
                         "intent": inode["intent"],
                         "intent_size": inode["intent_size"],
                     },

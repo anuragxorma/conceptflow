@@ -26,6 +26,9 @@ _OBJECT_COLOR = "#333333"
 def _html_escape(text: str) -> str:
     # Backslashes are doubled: Graphviz expands escapes such as \G (graph
     # name) even inside HTML-like labels, and "\\" is its literal backslash.
+    # Newlines and other control characters would vanish in an HTML-like
+    # label, so they become spaces, as in the TikZ output.
+    text = "".join(" " if ch.isspace() or ord(ch) < 32 else ch for ch in text)
     return (
         text.replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -136,7 +139,7 @@ class GraphvizFigure:
 
     def write(self, path: str | Path) -> Path:
         """Write DOT text (``.dot``/``.gv``) or a rendered file (other suffixes)."""
-        path = Path(path)
+        path = Path(path).expanduser()
         suffix = path.suffix.lower().lstrip(".")
         content = None if suffix in {"dot", "gv", ""} else self.render(suffix)
         path.parent.mkdir(parents=True, exist_ok=True)

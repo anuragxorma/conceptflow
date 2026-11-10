@@ -52,6 +52,12 @@ def latex_escape(text: str) -> str:
     )
 
 
+def _math_safe(argument: str) -> bool:
+    """Whether a ``\\sqrt`` argument can go into math mode as it is: no
+    characters that are special there and no unknown commands."""
+    return re.search(r"[\\&%#$]", LATEX_FRAGMENT.sub("", argument)) is None
+
+
 def latex_label(name: str) -> str:
     """
     ``name`` for a TikZ label: LaTeX such as ``\\sqrt{3}`` is typeset in math
@@ -60,6 +66,8 @@ def latex_label(name: str) -> str:
     text = re.sub(r"\$([^$]*\\[^$]*)\$", r"\1", str(name))
     parts, end = [], 0
     for match in LATEX_FRAGMENT.finditer(text):
+        if match.group(0).startswith("\\sqrt") and not _math_safe(match.group(0)[6:-1]):
+            continue  # stays text, escaped with what follows
         parts.append(latex_escape(text[end:match.start()]))
         parts.append(f"${match.group(0)}$")
         end = match.end()
@@ -284,7 +292,7 @@ class TikZFigure:
         return self.source
 
     def write(self, path: str | Path) -> Path:
-        path = Path(path)
+        path = Path(path).expanduser()
         suffix = path.suffix.lower()
         if suffix not in {".tex", ".pdf"}:
             raise ValueError(
