@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 (2026-11-10)
+
+Fixes only, no new features. The main ones: the third and deeper levels
+of interactive nested diagrams showed wrong filled nodes; iceberg
+lattices were drawn with broken rows and downward edges;
+`IncompleteContext` read `"0"` and NaN as crosses; and
+`get_feature_names_out` failed in Pipelines and ColumnTransformers after
+a step that returns arrays. The Eurovision example no longer needs a git
+submodule, and the benchmarks are measured again.
 
 ### Fixed
 
