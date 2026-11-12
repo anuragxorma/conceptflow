@@ -19,6 +19,13 @@ def test_html_figure_repr_html_isolates_the_page_in_an_iframe():
     assert "height: 400px" in shown
 
 
+def test_html_figure_marks_notebook_output():
+    # Pages that fill their window keep a fixed height in a notebook frame.
+    fig = HTMLFigure("<!DOCTYPE html>\n<html>\n<body></body></html>")
+    assert "&lt;html data-conceptflow-notebook&gt;" in fig._repr_html_()
+    assert fig.to_html() == "<!DOCTYPE html>\n<html>\n<body></body></html>"
+
+
 def test_html_figure_write_html_writes_file(tmp_path):
     fig = HTMLFigure("<div>Hello</div>")
     output_path = tmp_path / "figure.html"

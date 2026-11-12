@@ -93,9 +93,18 @@ The interactive page shows the same reduced labels; a concept's full extent
 and intent appear in its tooltip and, on click, in the details panel. Large
 lattices are drawn with smaller nodes so none overlap; zoom in with the
 mouse wheel to bring them back to full size. `show_attribute_labels=`,
-`show_object_labels=`, `max_label_items=` and `object_label=` work as for
-matplotlib below. `width` includes the 280 px details panel, which moves
-below the drawing in pages narrower than 560 px.
+`show_object_labels=`, `max_label_items=` (6 names and "+n" by default) and
+`object_label=` work as for matplotlib below; the buttons *Attribute labels*
+and *Object labels* show and hide the labels on the page.
+
+The page fills the browser window by default (`width="auto"`,
+`height="auto"`): the drawing takes the space beside the 280 px details
+panel and below the header, and fits itself again when the window is
+resized. If you have zoomed or panned, your view is kept until you click
+*Reset zoom*. In a notebook the drawing is as wide as the cell and 700 px
+high. Numbers fix the size in pixels, e.g. `width=900, height=700`; `width`
+then includes the details panel. In windows narrower than 560 px the panel
+moves below the drawing.
 
 ## matplotlib options
 
@@ -130,8 +139,9 @@ Nested line diagrams have the same backends; see
 - **Very large lattices in the interactive page.** Nodes shrink so that none
   overlap; on a few hundred concepts they are tiny until you zoom in.
 - **Labels can overlap** in dense diagrams, in every backend. `max_label_items=`,
-  `object_label=` and hiding one kind of label (`show_object_labels=False`)
-  help; a larger `width`/`height` (or `figsize`) spreads the drawing.
+  `object_label=` and hiding one kind of label (`show_object_labels=False`,
+  or the label buttons on the interactive pages) help; a larger window (or
+  `figsize`) spreads the drawing.
 - **The interactive pages need internet access**: they load D3 (and, for the
   nested PDF export, jsPDF and svg2pdf.js) from public CDNs, in exact
   versions.

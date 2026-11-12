@@ -18,8 +18,8 @@ def plot_lattice(
     backend: str = "d3",
     layout: str = "dimflux",
     stable_ids: bool = False,
-    width: int = 900,
-    height: int = 700,
+    width: int | str = "auto",
+    height: int | str = "auto",
     title: str | None = None,
     timeout_ms: int | None = 1000,
     **kwargs,
@@ -62,8 +62,10 @@ def plot_lattice(
         instead of local node ids c0, c1, ...
 
     width, height:
-        Figure size in pixels. For the matplotlib backend they set
-        ``figsize`` at 100 dpi unless ``figsize`` is passed explicitly.
+        Figure size in pixels. For the d3 backend, "auto" (the default)
+        fills the browser window, or the notebook cell with a 700 px high
+        drawing. For the matplotlib backend they set ``figsize`` at 100 dpi
+        unless ``figsize`` is passed explicitly; "auto" is 900 x 700.
 
     title:
         Figure title. Defaults to "Concept lattice" for the d3 backend and
@@ -127,7 +129,9 @@ def plot_lattice(
     if backend == "matplotlib":
         from conceptflow.visualization.static import render_lattice_matplotlib
 
-        kwargs.setdefault("figsize", (width / 100, height / 100))
+        figure_width = 900 if width == "auto" else width
+        figure_height = 700 if height == "auto" else height
+        kwargs.setdefault("figsize", (figure_width / 100, figure_height / 100))
         return render_lattice_matplotlib(graph_data, title=title, **kwargs)
 
     return render_with_d3(

@@ -32,21 +32,63 @@ def test_html_width_must_be_positive(width):
         plot_nested(make_nested_view(), width=width)
 
 
-@pytest.mark.parametrize("width, drawing_width", [(100, 100), (559, 559), (560, 280), (900, 620)])
-def test_narrow_pages_put_the_details_panel_below_the_drawing(width, drawing_width):
-    for figure, svg_id in (
-        (plot_lattice(make_lattice(), layout="layered", width=width), "conceptflow-svg"),
-        (plot_nested(make_nested_view(), width=width), "conceptflow-nested-svg"),
+@pytest.mark.parametrize("width", [100, 559, 560, 900])
+def test_narrow_pages_put_the_details_panel_below_the_drawing(width):
+    for figure in (
+        plot_lattice(make_lattice(), layout="layered", width=width),
+        plot_nested(make_nested_view(), width=width),
     ):
-        assert f'<svg id="{svg_id}" width="{drawing_width}"' in figure.html
+        assert f"width: {width}px" in figure.html
         assert ("border-top" in figure.html) == (width < 560)
+
+
+def test_pages_fill_the_window_by_default():
+    for figure in (
+        plot_lattice(make_lattice(), layout="layered"),
+        plot_nested(make_nested_view()),
+    ):
+        # Full width, the panel below the drawing in narrow windows, and a
+        # 700 px drawing until the page sets the window's height.
+        assert ".conceptflow-container { width: 100%;" in figure.html
+        assert "@media (max-width: 559.98px)" in figure.html
+        assert "--drawing-height: 700px" in figure.html
+        assert '"autoHeight": true' in figure.html
+        assert figure.height == 700
+    fixed = plot_lattice(make_lattice(), layout="layered", width="auto", height=500)
+    assert '"autoHeight": false' in fixed.html and fixed.height == 500
 
 
 def test_html_size_rejects_text_and_zero_height():
     with pytest.raises(TypeError, match="width"):
         plot_lattice(make_lattice(), layout="layered", width="900")
+    with pytest.raises(TypeError, match="height"):
+        plot_nested(make_nested_view(), height="full")
     with pytest.raises(ValueError, match="height"):
         plot_lattice(make_lattice(), layout="layered", height=0)
+
+
+def test_nested_d3_label_options():
+    import json
+    import re
+
+    def settings(figure):
+        return json.loads(re.search(r"const settings = (.*);\n", figure.html).group(1))
+
+    default = settings(plot_nested(make_nested_view()))
+    assert default["showAttributeLabels"] and default["showObjectLabels"]
+    assert default["maxLabelItems"] == 6
+    chosen = settings(plot_nested(
+        make_nested_view(), show_object_labels=False, max_label_items=None
+    ))
+    assert chosen["showObjectLabels"] is False and chosen["maxLabelItems"] is None
+    # NumPy integers pass the check, so they must reach the page as numbers.
+    assert settings(plot_nested(make_nested_view(), max_label_items=np.int64(3)))[
+        "maxLabelItems"
+    ] == 3
+    with pytest.raises(ValueError, match="max_label_items"):
+        plot_nested(make_nested_view(), max_label_items=-1)
+    with pytest.raises(TypeError, match="figsize"):
+        plot_nested(make_nested_view(), figsize=(4, 4))
 
 
 @pytest.mark.parametrize("backend", ["matplotlib", "tikz", "graphviz"])

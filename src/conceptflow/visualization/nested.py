@@ -39,7 +39,12 @@ from sklearn.utils import check_scalar
 from conceptflow._deprecation import warn_deprecated
 from conceptflow.exploration.combinations import realized_pairs
 from conceptflow.exploration.view import ExplorationView
-from conceptflow.visualization._checks import html_page_layout, object_formatter
+from conceptflow.visualization._checks import (
+    SIZE_SCRIPT,
+    check_max_label_items,
+    html_page_layout,
+    object_formatter,
+)
 from conceptflow.visualization._text import display_text
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.html_figure import HTMLFigure, script_json
@@ -773,10 +778,13 @@ def _with_display_names(value, key=None):
 
 def render_nested_html(
     data: dict[str, Any],
-    width: int = 900,
-    height: int = 700,
+    width: int | str = "auto",
+    height: int | str = "auto",
     title: str | None = None,
     show_child_previews: bool = True,
+    show_attribute_labels: bool = True,
+    show_object_labels: bool = True,
+    max_label_items: int | None = 6,
 ) -> str:
     """
     Render nested exploration data as an interactive D3 view with subdirect
@@ -787,14 +795,31 @@ def render_nested_html(
     - Click a node with a child view: navigate into that child view.
     - Back / Root: navigate up.
     - Nodes at the outer level show the shared inner template (hollow/filled).
+    - Attribute labels / Object labels: show or hide the labels.
 
-    ``width`` includes the 280 px details panel, which moves below the
-    drawing in pages narrower than 560 px.
+    ``width="auto"`` fills the window (or the notebook cell) and
+    ``height="auto"`` the window below the header; in a notebook the drawing
+    is 700 px high. The drawing fits itself again when the window is
+    resized. Numbers fix the size in pixels; ``width`` then includes the
+    280 px details panel, which moves below the drawing in pages narrower
+    than 560 px.
+
+    Labels list at most ``max_label_items`` names and "+n" (``None`` shows
+    all); the details panel lists all of them. ``show_attribute_labels`` and
+    ``show_object_labels`` set whether labels are shown when the page opens.
     """
     page = html_page_layout(width, height)
+    check_max_label_items(max_label_items)
     data_json = script_json(_with_display_names(data))
     display_title = script_json(display_text(title or data["name"]))
     show_child_previews_json = json.dumps(show_child_previews)
+    settings_json = json.dumps({
+        "autoHeight": page["auto_height"],
+        "showAttributeLabels": bool(show_attribute_labels),
+        "showObjectLabels": bool(show_object_labels),
+        # int(): NumPy integers pass the check but are not JSON.
+        "maxLabelItems": None if max_label_items is None else int(max_label_items),
+    })
 
     return f"""
 <!DOCTYPE html>
@@ -812,8 +837,6 @@ def render_nested_html(
   }}
 
   .conceptflow-container {{
-    width: {width}px;
-    max-width: 100%;
     border: 1px solid #ddd;
     border-radius: 10px;
     overflow: hidden;
@@ -822,9 +845,10 @@ def render_nested_html(
 
   .conceptflow-header {{
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    gap: 8px 12px;
     padding: 10px 14px;
     background: #f2f2f2;
     border-bottom: 1px solid #ddd;
@@ -843,6 +867,7 @@ def render_nested_html(
 
   .conceptflow-controls {{
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
   }}
 
@@ -864,14 +889,17 @@ def render_nested_html(
     background: #f7f7f7;
   }}
 
+  /* Label buttons: pressed while their labels are shown. */
+  .conceptflow-button[aria-pressed="true"] {{
+    background: #e8eef5;
+    border-color: #1f4e79;
+  }}
+
   .conceptflow-body {{
     display: grid;
-    grid-template-columns: {page['columns']};
-    min-height: {height}px;
   }}
 
   .conceptflow-details {{
-    {page['panel_border']}: 1px solid #ddd;
     background: #fafafa;
     padding: 12px;
     font-size: 12px;
@@ -1014,6 +1042,8 @@ def render_nested_html(
     stroke-width: 2px;
     stroke-linejoin: round;
   }}
+
+  {page['css']}
 </style>
 </head>
 <body>
@@ -1027,6 +1057,8 @@ def render_nested_html(
     <div class="conceptflow-controls">
       <button id="conceptflow-back" class="conceptflow-button">Back</button>
       <button id="conceptflow-root" class="conceptflow-button">Root</button>
+      <button id="conceptflow-attribute-labels" class="conceptflow-button">Attribute labels</button>
+      <button id="conceptflow-object-labels" class="conceptflow-button">Object labels</button>
       <button id="conceptflow-reset-zoom" class="conceptflow-button">Reset zoom</button>
       <button id="conceptflow-save-svg" class="conceptflow-button">Save SVG</button>
       <button id="conceptflow-save-png" class="conceptflow-button">Save PNG</button>
@@ -1035,7 +1067,7 @@ def render_nested_html(
   </div>
 
   <div class="conceptflow-body">
-    <svg id="conceptflow-nested-svg" width="{page['drawing_width']}" height="{height}"></svg>
+    <svg id="conceptflow-nested-svg" class="conceptflow-drawing"></svg>
 
     <div id="conceptflow-details" class="conceptflow-details">
       <div class="details-title">Details</div>
@@ -1047,9 +1079,8 @@ def render_nested_html(
 <script>
 const rootData = {data_json};
 const showChildPreviews = {show_child_previews_json};
-const svgWidth = {page['drawing_width']};
-const svgHeight = {height};
-
+const settings = {settings_json};
+{SIZE_SCRIPT}
 const svg = d3.select("#conceptflow-nested-svg");
 const details = d3.select("#conceptflow-details");
 
@@ -1071,9 +1102,30 @@ const zoom = d3.zoom()
   .scaleExtent([0.3, 8])
   .on("zoom", (event) => {{
     rootLayer.attr("transform", event.transform);
+    // Zoomed or panned by the reader: keep their view when the page resizes.
+    if (event.sourceEvent) sizer.held = true;
   }});
 
 svg.call(zoom);
+
+let showAttributeLabels = settings.showAttributeLabels;
+let showObjectLabels = settings.showObjectLabels;
+
+// At most settings.maxLabelItems names, then "+n" (as in the other backends).
+function joinLabels(items) {{
+  const limit = settings.maxLabelItems;
+  if (limit !== null && items.length > limit) {{
+    return [...items.slice(0, limit), "+" + (items.length - limit)].join(", ");
+  }}
+  return items.join(", ");
+}}
+
+function applyLabelVisibility() {{
+  svg.selectAll(".attr-label, .inner-attr").attr("display", showAttributeLabels ? null : "none");
+  svg.selectAll(".obj-label").attr("display", showObjectLabels ? null : "none");
+  d3.select("#conceptflow-attribute-labels").attr("aria-pressed", showAttributeLabels);
+  d3.select("#conceptflow-object-labels").attr("aria-pressed", showObjectLabels);
+}}
 
 function resetZoom(duration = 400) {{
   svg.transition()
@@ -1308,7 +1360,7 @@ function drawTemplatePreview(parentGroup, innerTemplate, filledInner, radius, sh
       .attr("class", "inner-attr")
       .attr("x", d => transform(d).x)
       .attr("y", d => transform(d).y - 6)
-      .text(d => d.new_attrs.join(", "));
+      .text(d => joinLabels(d.new_attrs));
   }}
 }}
 
@@ -1350,16 +1402,23 @@ function drawChildPreview(parentGroup, childData, radius) {{
 
 function renderView(viewData) {{
   currentView = viewData;
-
-  rootLayer.selectAll("*").remove();
+  sizer.held = false;
   resetZoom(0);
   updateHeader();
   showDefaultDetails();
+  sizer.draw();
+}}
+
+// Draw the current view fitted to the drawing area (also after a resize).
+function drawView(size) {{
+  const viewData = currentView;
+  rootLayer.selectAll("*").remove();
 
   const hasTemplate = !!viewData.inner_template;
 
   const transform = computeTransform(
-    viewData.nodes, svgWidth, svgHeight, Math.min(100, svgWidth / 6, svgHeight / 6)
+    viewData.nodes, size.width, size.height,
+    Math.min(100, size.width / 6, size.height / 6)
   );
   const nodeById = new Map(viewData.nodes.map(d => [d.id, d]));
 
@@ -1447,30 +1506,34 @@ function renderView(viewData) {{
     }}
   }}
 
-  // Attribute labels ABOVE each node — comma-separated on one line.
+  // Attribute labels ABOVE each node, object labels BELOW: one line each,
+  // shortened to settings.maxLabelItems names (all are in the details panel).
   nodeGroup.each(function(d) {{
     if (!d.new_attrs || d.new_attrs.length === 0) return;
     d3.select(this).append("text")
       .attr("class", "attr-label")
       .attr("x", 0)
       .attr("y", -(d.radius + 10))
-      .text(d.new_attrs.join(", "));
+      .text(joinLabels(d.new_attrs));
   }});
 
-  // Object labels BELOW each node — comma-separated on one line.
   nodeGroup.each(function(d) {{
     if (!d.new_objects || d.new_objects.length === 0) return;
     d3.select(this).append("text")
       .attr("class", "obj-label")
       .attr("x", 0)
       .attr("y", d.radius + 13)
-      .text(d.new_objects.join(", "));
+      .text(joinLabels(d.new_objects));
   }});
+
+  applyLabelVisibility();
 }}
 
 function getStyledSVGString() {{
   const svgEl = document.getElementById("conceptflow-nested-svg");
   const clone = svgEl.cloneNode(true);
+  // Hidden labels are left out of the files.
+  clone.querySelectorAll('[display="none"]').forEach(node => node.remove());
   const css = `
     .edge {{ stroke: #555; stroke-width: 1.5; opacity: 0.65; }}
     .edge.highlighted {{ stroke: #1f4e79; stroke-width: 3; opacity: 1; }}
@@ -1512,9 +1575,7 @@ function saveSVG() {{
 }}
 
 function savePNG() {{
-  const svgEl = document.getElementById("conceptflow-nested-svg");
-  const w = parseInt(svgEl.getAttribute("width"));
-  const h = parseInt(svgEl.getAttribute("height"));
+  const {{ width: w, height: h }} = drawnSize();
   const svgStr = getStyledSVGString();
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -1543,9 +1604,27 @@ function savePNG() {{
   img.src = url;
 }}
 
+// The size of the drawing in whole pixels, as the files are saved.
+function drawnSize() {{
+  const size = sizer.size();
+  return {{ width: Math.round(size.width), height: Math.round(size.height) }};
+}}
+
 backButton.on("click", goBack);
 rootButton.on("click", goRoot);
-resetZoomButton.on("click", () => resetZoom(500));
+resetZoomButton.on("click", () => {{
+  sizer.held = false;
+  resetZoom(500);
+  sizer.resized();
+}});
+d3.select("#conceptflow-attribute-labels").on("click", () => {{
+  showAttributeLabels = !showAttributeLabels;
+  applyLabelVisibility();
+}});
+d3.select("#conceptflow-object-labels").on("click", () => {{
+  showObjectLabels = !showObjectLabels;
+  applyLabelVisibility();
+}});
 // Vector PDF (sharp at any zoom) through svg2pdf.js. jsPDF's standard fonts
 // cover Latin-1 only, so names with other characters (√, α, ...) and a
 // failed plugin load fall back to the image PDF below.
@@ -1557,8 +1636,7 @@ function savePDF() {{
     saveImagePDF();
     return;
   }}
-  const w = parseInt(svgEl.getAttribute("width"));
-  const h = parseInt(svgEl.getAttribute("height"));
+  const {{ width: w, height: h }} = drawnSize();
   const holder = document.createElement("div");
   holder.style.cssText = "position: absolute; left: -10000px; top: 0;";
   holder.innerHTML = getStyledSVGString();
@@ -1584,9 +1662,7 @@ function savePDF() {{
 }}
 
 function saveImagePDF() {{
-  const svgEl = document.getElementById("conceptflow-nested-svg");
-  const w = parseInt(svgEl.getAttribute("width"));
-  const h = parseInt(svgEl.getAttribute("height"));
+  const {{ width: w, height: h }} = drawnSize();
   const svgStr = getStyledSVGString();
   const scale = 2;
   const canvas = document.createElement("canvas");
@@ -1621,6 +1697,9 @@ d3.select("#conceptflow-save-svg").on("click", saveSVG);
 d3.select("#conceptflow-save-png").on("click", savePNG);
 d3.select("#conceptflow-save-pdf").on("click", savePDF);
 
+const sizer = conceptflowSizer(
+  document.getElementById("conceptflow-nested-svg"), settings.autoHeight, drawView
+);
 renderView(rootData);
 </script>
 </body>
@@ -1631,8 +1710,8 @@ def plot_nested(
     view,
     mode: str = "navigator",
     show_child_previews: bool = True,
-    width: int = 900,
-    height: int = 700,
+    width: int | str = "auto",
+    height: int | str = "auto",
     title: str | None = None,
     object_label: Callable[[str], str] | None = None,
     backend: str = "d3",
@@ -1653,7 +1732,9 @@ def plot_nested(
     view:
         Root ExplorationView to render.
     width, height:
-        Figure size in pixels (d3 backend).
+        Page size for the d3 backend: "auto" (the default) fills the
+        browser window, or the notebook cell with a 700 px high drawing; a
+        number fixes the size in pixels.
     show_child_previews:
         Whether to draw the inner template preview inside outer nodes.
     backend:
@@ -1666,8 +1747,11 @@ def plot_nested(
     timeout_ms:
         DimFlux time limit per layout; see ``lattice_to_graph_data_dimflux``.
     **kwargs:
-        Passed to ``render_nested_matplotlib`` (e.g. ``ax``, ``figsize``,
-        ``show_object_labels``).
+        Label options for every backend: ``show_attribute_labels``,
+        ``show_object_labels`` and ``max_label_items`` (for "d3": shown,
+        shown and 6 names by default; the page has buttons to show and hide
+        the labels). Other options go to ``render_nested_matplotlib`` (e.g.
+        ``ax``, ``figsize``) or ``nested_data_to_tikz``.
 
     Returns
     -------
@@ -1715,10 +1799,10 @@ def plot_nested(
         view, object_label=object_label, timeout_ms=timeout_ms
     )
 
-    if kwargs:
-        raise TypeError(
-            f"Unexpected arguments for the d3 backend: {sorted(kwargs)}"
-        )
+    label_options = {"show_attribute_labels", "show_object_labels", "max_label_items"}
+    unexpected = sorted(set(kwargs) - label_options)
+    if unexpected:
+        raise TypeError(f"Unexpected arguments for the d3 backend: {unexpected}")
 
     html = render_nested_html(
         data,
@@ -1726,5 +1810,6 @@ def plot_nested(
         height=height,
         title=title,
         show_child_previews=show_child_previews,
+        **kwargs,
     )
-    return HTMLFigure(html, height=height)
+    return HTMLFigure(html, height=html_page_layout(width, height)["figure_height"])

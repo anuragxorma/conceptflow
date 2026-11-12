@@ -16,6 +16,28 @@
   scores 0.986 instead of 1.0. Scores computed with 0.6.0 or 0.6.1, and
   with the original implementation the metrics were ported from, differ;
   recompute them to compare with new ones.
+- **The interactive nested diagram listed every object of a node in one
+  line,** so with many objects the labels ran into each other and off the
+  drawing. Its labels now list at most `max_label_items` names (6 by
+  default) and "+n", like the line diagram page and the other backends, and
+  `plot_nested` takes `show_attribute_labels`, `show_object_labels` and
+  `max_label_items` for the d3 backend too, instead of raising `TypeError`.
+  The details panel still lists all objects.
+- **The interactive pages use the whole window.** They were 900 × 700 px
+  and left-aligned, whatever the window size. `width` and `height` now
+  default to `"auto"`: the drawing fills the browser window beside the
+  details panel and below the header, and fits itself again when the window
+  is resized (a view you have zoomed or panned is kept until *Reset zoom*).
+  In a notebook the drawing is as wide as the cell and 700 px high. Numbers
+  still fix the size, and such pages are now centred.
+
+### Added
+
+- Buttons *Attribute labels* and *Object labels* on the interactive line
+  and nested diagram pages show and hide the labels;
+  `show_attribute_labels` and `show_object_labels` set how the page opens.
+  The line diagram page also has a *Reset zoom* button, and the nested
+  page's saved files contain only the labels that are shown.
 
 ## 0.6.1 (2026-11-10)
 

@@ -44,11 +44,16 @@ class HTMLFigure:
         """
         The page in its own ``<iframe>``, so that several figures in one
         notebook do not share ids, scripts or styles with each other or with
-        the notebook. The frame grows to the page's height once loaded.
+        the notebook. The frame grows to the page's height once loaded, so
+        the page is marked as notebook output: a page that fills its window
+        keeps a fixed height here instead.
         """
+        from conceptflow.visualization._checks import NOTEBOOK_MARKER
+
         height = (self.height or 700) + 100
+        page = self.html.replace("<html>", f"<html {NOTEBOOK_MARKER}>", 1)
         return (
-            f'<iframe srcdoc="{html.escape(self.html, quote=True)}" '
+            f'<iframe srcdoc="{html.escape(page, quote=True)}" '
             f'style="width: 100%; height: {height}px; border: none;" '
             'onload="this.style.height = '
             "(this.contentDocument.documentElement.scrollHeight + 4) + 'px';\"></iframe>"

@@ -5,10 +5,12 @@ D3 backend for ordinary ConceptFlow lattice diagrams.
 from __future__ import annotations
 
 import html
+import json
 from collections.abc import Callable
 from typing import Any
 
 from conceptflow.visualization._checks import (
+    SIZE_SCRIPT,
     check_max_label_items,
     html_page_layout,
     object_formatter,
@@ -48,8 +50,8 @@ def graph_data_to_d3_data(graph_data: GraphData) -> dict[str, Any]:
 
 def render_graph_data_html(
     graph_data: GraphData,
-    width: int = 900,
-    height: int = 700,
+    width: int | str = "auto",
+    height: int | str = "auto",
     title: str = "Concept lattice",
     show_attribute_labels: bool = True,
     show_object_labels: bool = True,
@@ -59,13 +61,20 @@ def render_graph_data_html(
     """
     Render GraphData as a standalone D3 HTML string.
 
-    ``width`` includes the 280 px details panel, which moves below the
-    drawing in pages narrower than 560 px.
+    ``width="auto"`` fills the window (or the notebook cell) and
+    ``height="auto"`` the window below the header; in a notebook the drawing
+    is 700 px high. The drawing fits itself again when the window is
+    resized. Numbers fix the size in pixels; ``width`` then includes the
+    280 px details panel, which moves below the drawing in pages narrower
+    than 560 px.
 
     Labels follow reduced labelling, as in the other backends: attributes
-    above the node that introduces them, objects below. The full extent and
-    intent of a concept appear in its tooltip and, on click, in the details
-    panel.
+    above the node that introduces them, objects below, each shortened to
+    ``max_label_items`` names and "+n" (``None`` shows all). The full extent
+    and intent of a concept appear in its tooltip and, on click, in the
+    details panel. ``show_attribute_labels`` and ``show_object_labels`` set
+    whether the labels are shown when the page opens; buttons on the page
+    turn them on and off.
     """
     from conceptflow.visualization.static import _join_labels, _reduced_labels
 
@@ -75,11 +84,16 @@ def render_graph_data_html(
     attributes_at, objects_at = _reduced_labels(graph_data)
     format_object = object_formatter(object_label)
     for node in data["nodes"]:
-        attributes = sorted(attributes_at[node["id"]]) if show_attribute_labels else []
-        objects = sorted(map(format_object, objects_at[node["id"]])) if show_object_labels else []
+        attributes = sorted(attributes_at[node["id"]])
+        objects = sorted(map(format_object, objects_at[node["id"]]))
         node["attribute_text"] = _join_labels(attributes, max_label_items)
         node["object_text"] = _join_labels(objects, max_label_items)
     data_json = script_json(data)
+    settings_json = json.dumps({
+        "autoHeight": page["auto_height"],
+        "showAttributeLabels": bool(show_attribute_labels),
+        "showObjectLabels": bool(show_object_labels),
+    })
 
     return f"""
 <!DOCTYPE html>
@@ -95,8 +109,6 @@ def render_graph_data_html(
   }}
 
   .conceptflow-container {{
-    width: {width}px;
-    max-width: 100%;
     border: 1px solid #ddd;
     border-radius: 10px;
     overflow: hidden;
@@ -104,9 +116,39 @@ def render_graph_data_html(
   }}
 
   .conceptflow-header {{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px 12px;
     padding: 10px 14px;
     background: #f2f2f2;
     border-bottom: 1px solid #ddd;
+  }}
+
+  .conceptflow-controls {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }}
+
+  .conceptflow-button {{
+    border: 1px solid #aaa;
+    background: white;
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }}
+
+  .conceptflow-button:hover {{
+    background: #f7f7f7;
+  }}
+
+  /* Label buttons: pressed while their labels are shown. */
+  .conceptflow-button[aria-pressed="true"] {{
+    background: #e8eef5;
+    border-color: #1f4e79;
   }}
 
   .conceptflow-title {{
@@ -122,12 +164,9 @@ def render_graph_data_html(
 
   .conceptflow-body {{
     display: grid;
-    grid-template-columns: {page['columns']};
-    min-height: {height}px;
   }}
 
   .conceptflow-details {{
-    {page['panel_border']}: 1px solid #ddd;
     background: #fafafa;
     padding: 12px;
     font-size: 12px;
@@ -211,17 +250,26 @@ def render_graph_data_html(
     fill: #444;
     font-style: italic;
   }}
+
+  {page['css']}
 </style>
 </head>
 <body>
 <div class="conceptflow-container">
   <div class="conceptflow-header">
-    <div class="conceptflow-title">{html.escape(title)}</div>
-    <div id="conceptflow-subtitle" class="conceptflow-subtitle"></div>
+    <div>
+      <div class="conceptflow-title">{html.escape(title)}</div>
+      <div id="conceptflow-subtitle" class="conceptflow-subtitle"></div>
+    </div>
+    <div class="conceptflow-controls">
+      <button id="conceptflow-attribute-labels" class="conceptflow-button">Attribute labels</button>
+      <button id="conceptflow-object-labels" class="conceptflow-button">Object labels</button>
+      <button id="conceptflow-reset-zoom" class="conceptflow-button">Reset zoom</button>
+    </div>
   </div>
 
   <div class="conceptflow-body">
-    <svg id="conceptflow-svg" width="{page['drawing_width']}" height="{height}"></svg>
+    <svg id="conceptflow-svg" class="conceptflow-drawing"></svg>
 
     <div id="conceptflow-details" class="conceptflow-details">
       <div class="details-title">Details</div>
@@ -232,9 +280,8 @@ def render_graph_data_html(
 
 <script>
 const graphData = {data_json};
-const svgWidth = {page['drawing_width']};
-const svgHeight = {height};
-
+const settings = {settings_json};
+{SIZE_SCRIPT}
 const svg = d3.select("#conceptflow-svg");
 const details = d3.select("#conceptflow-details");
 const subtitle = d3.select("#conceptflow-subtitle");
@@ -252,9 +299,21 @@ const zoom = d3.zoom()
   .scaleExtent([0.3, 8])
   .on("zoom", (event) => {{
     rootLayer.attr("transform", event.transform);
+    // Zoomed or panned by the reader: keep their view when the page resizes.
+    if (event.sourceEvent) sizer.held = true;
   }});
 
 svg.call(zoom);
+
+let showAttributeLabels = settings.showAttributeLabels;
+let showObjectLabels = settings.showObjectLabels;
+
+function applyLabelVisibility() {{
+  svg.selectAll(".attr-label").attr("display", showAttributeLabels ? null : "none");
+  svg.selectAll(".obj-label").attr("display", showObjectLabels ? null : "none");
+  d3.select("#conceptflow-attribute-labels").attr("aria-pressed", showAttributeLabels);
+  d3.select("#conceptflow-object-labels").attr("aria-pressed", showObjectLabels);
+}}
 
 function escapeHtml(text) {{
   return String(text).replace(/[&<>"']/g, c => ({{
@@ -383,11 +442,12 @@ function computeTransform(nodes, targetWidth, targetHeight, padding, rotate) {{
   }};
 }}
 
-function render() {{
+function render(size) {{
   rootLayer.selectAll("*").remove();
 
   const transform = computeTransform(
-    graphData.nodes, svgWidth, svgHeight, Math.min(80, svgWidth / 6, svgHeight / 6),
+    graphData.nodes, size.width, size.height,
+    Math.min(80, size.width / 6, size.height / 6),
     graphData.rotate !== false
   );
   const nodeById = new Map(graphData.nodes.map(d => [d.id, d]));
@@ -459,9 +519,29 @@ function render() {{
     .attr("class", "obj-label")
     .attr("y", radius * 1.3)
     .text(d => d.object_text);
+
+  applyLabelVisibility();
 }}
 
-render();
+const sizer = conceptflowSizer(
+  document.getElementById("conceptflow-svg"), settings.autoHeight, render
+);
+
+d3.select("#conceptflow-attribute-labels").on("click", () => {{
+  showAttributeLabels = !showAttributeLabels;
+  applyLabelVisibility();
+}});
+d3.select("#conceptflow-object-labels").on("click", () => {{
+  showObjectLabels = !showObjectLabels;
+  applyLabelVisibility();
+}});
+d3.select("#conceptflow-reset-zoom").on("click", () => {{
+  sizer.held = false;
+  svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  sizer.resized();
+}});
+
+sizer.draw();
 </script>
 </body>
 </html>
@@ -470,8 +550,8 @@ render();
 
 def render_with_d3(
     graph_data: GraphData,
-    width: int = 900,
-    height: int = 700,
+    width: int | str = "auto",
+    height: int | str = "auto",
     title: str = "Concept lattice",
     **label_options,
 ) -> HTMLFigure:
@@ -495,5 +575,5 @@ def render_with_d3(
             title=title,
             **label_options,
         ),
-        height=height,
+        height=html_page_layout(width, height)["figure_height"],
     )

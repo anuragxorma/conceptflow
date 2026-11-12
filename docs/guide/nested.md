@@ -87,6 +87,19 @@ cannot be entered. If a view's top concept was not expanded, clicking one of
 its concepts opens that concept's child view as a separate diagram of its
 objects.
 
+### Labels and size
+
+Like the line diagram page, the nested page fills the browser window (or
+the notebook cell) and lists at most 6 names per label, then "+n"; clicking
+a node lists all of its objects in the details panel. The buttons
+*Attribute labels* and *Object labels* show and hide the labels, and the
+saved SVG, PNG and PDF files contain the labels that are shown. With many
+objects, start without object labels:
+
+```python
+html = plot_nested(outer, show_object_labels=False)  # or max_label_items=3
+```
+
 ## Static figures
 
 `backend="matplotlib"` and `backend="tikz"` draw the first nesting level as a

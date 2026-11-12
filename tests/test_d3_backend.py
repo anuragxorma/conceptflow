@@ -96,8 +96,9 @@ def test_plot_lattice_d3_backend_accepts_custom_size_and_title():
 
     assert isinstance(fig, HTMLFigure)
     assert "Custom lattice" in fig.html
-    assert "width=\"720\"" in fig.html
-    assert "min-height: 800px" in fig.html
+    assert "width: 1000px" in fig.html
+    assert "--drawing-height: 800px" in fig.html
+    assert fig.height == 800
 
 
 def _page_data(html):
@@ -106,6 +107,14 @@ def _page_data(html):
     import re
 
     return json.loads(re.search(r"const graphData = (.*);\n", html).group(1))
+
+
+def _page_settings(html):
+    """The settings the page starts with (label visibility, sizing)."""
+    import json
+    import re
+
+    return json.loads(re.search(r"const settings = (.*);\n", html).group(1))
 
 
 def test_d3_uses_reduced_labels():
@@ -131,11 +140,13 @@ def test_d3_uses_reduced_labels():
 
 def test_d3_label_options():
     graph_data = lattice_to_graph_data(make_lattice())
-    nodes = _page_data(
-        render_graph_data_html(graph_data, show_attribute_labels=False, object_label=str.upper)
-    )["nodes"]
-    assert all(node["attribute_text"] == "" for node in nodes)
+    html = render_graph_data_html(graph_data, show_attribute_labels=False, object_label=str.upper)
+    nodes = _page_data(html)["nodes"]
+    # Hidden labels are still on the page, for its "Attribute labels" button.
+    assert any(node["attribute_text"] for node in nodes)
     assert sorted(node["object_text"] for node in nodes if node["object_text"]) == ["G1", "G2"]
+    settings = _page_settings(html)
+    assert settings["showAttributeLabels"] is False and settings["showObjectLabels"] is True
     many = FormalContext.from_array(np.ones((1, 8)), objects=["g"], attributes=list("abcdefgh"))
     html = plot_lattice(ConceptLattice.from_context(many), layout="layered", max_label_items=2).html
     assert "a, b, +6" in html

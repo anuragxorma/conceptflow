@@ -349,4 +349,188 @@ def test_several_figures_in_one_notebook_page(open_page):
     heights = [f.evaluate("() => document.documentElement.scrollHeight") for f in frames]
     boxes = [e.bounding_box()["height"] for e in page.query_selector_all("iframe")]
     assert all(abs(box - height) <= 8 for box, height in zip(boxes, heights, strict=True))
+    # The pages fill the window when saved, but in a notebook (whose frame
+    # grows to the page) the drawing is 700 px high and as wide as the cell.
+    for frame, iframe in zip(frames, page.query_selector_all("iframe"), strict=True):
+        svg = frame.evaluate("() => { const b = document.querySelector('svg')"
+                             ".getBoundingClientRect(); return [b.width, b.height]; }")
+        assert svg[1] == pytest.approx(700, abs=1)
+        assert svg[0] == pytest.approx(iframe.bounding_box()["width"] - 282, abs=2)
     assert page.inner_text("h1") == "notebook" and errors == []
+
+
+# A drawing in its window: its size, its nodes' centres, and whether every
+# node lies inside the drawing.
+_DRAWING = """() => {
+    const svg = document.querySelector('svg.conceptflow-drawing');
+    const s = svg.getBoundingClientRect();
+    const nodes = [...svg.querySelectorAll('g.node-group > circle')].map(c => {
+        const r = c.getBoundingClientRect();
+        return [r.x + r.width / 2, r.y + r.height / 2, r.width / 2];
+    });
+    return {
+        width: s.width, height: s.height,
+        drawnWidth: Number(svg.getAttribute('width')),
+        drawnHeight: Number(svg.getAttribute('height')),
+        pageHeight: document.documentElement.scrollHeight,
+        nodes: nodes,
+        inside: nodes.every(([x, y, r]) => x - r >= s.left - 0.5 && x + r <= s.right + 0.5
+            && y - r >= s.top - 0.5 && y + r <= s.bottom + 0.5),
+    };
+}"""
+
+
+def _drawn_for_current_size(page):
+    """Wait until the drawing has been fitted to the current size of its area."""
+    page.wait_for_function(
+        """() => {
+            const svg = document.querySelector('svg.conceptflow-drawing');
+            const s = svg.getBoundingClientRect();
+            return Math.abs(Number(svg.getAttribute('width')) - s.width) <= 1
+                && Math.abs(Number(svg.getAttribute('height')) - s.height) <= 1;
+        }""",
+        timeout=5_000,
+    )
+    _wait_until_still(page)
+    return page.evaluate(_DRAWING)
+
+
+def _window_figures():
+    living = load_context("livingbeings_en")
+    return {
+        "line diagram": plot_lattice(ConceptLattice.from_context(living)),
+        "nested diagram": _nested(living, range(5), range(5, 9)),
+    }
+
+
+@pytest.mark.parametrize("name", ["line diagram", "nested diagram"])
+def test_pages_fill_the_window_and_follow_its_size(open_page, name):
+    page, errors = open_page(_window_figures()[name].html,
+                             viewport={"width": 1600, "height": 900})
+    drawing = _drawn_for_current_size(page)
+    # All the window but the details panel (and the frame's border) and the
+    # header, without scrolling.
+    assert drawing["width"] == pytest.approx(1600 - 282, abs=2)
+    assert drawing["height"] > 700 and drawing["pageHeight"] <= 900
+    assert drawing["inside"]
+
+    page.set_viewport_size({"width": 1100, "height": 650})
+    smaller = _drawn_for_current_size(page)
+    assert smaller["width"] == pytest.approx(1100 - 282, abs=2)
+    assert smaller["pageHeight"] <= 650 and smaller["inside"]
+
+    # A view the reader has zoomed stays as it is when the window changes,
+    # until they reset the zoom.
+    page.mouse.move(400, 300)
+    page.mouse.wheel(0, -400)
+    _wait_until_still(page)
+    zoomed = page.evaluate(_DRAWING)["nodes"]
+    page.set_viewport_size({"width": 1300, "height": 800})
+    page.wait_for_timeout(400)
+    _wait_until_still(page)
+    assert page.evaluate(_DRAWING)["nodes"] == zoomed
+    page.click("#conceptflow-reset-zoom")
+    reset = _drawn_for_current_size(page)
+    assert reset["width"] == pytest.approx(1300 - 282, abs=2) and reset["inside"]
+    assert errors == []
+
+
+def test_fixed_size_pages_are_centred(open_page):
+    living = load_context("livingbeings_en")
+    for figure in (
+        plot_lattice(ConceptLattice.from_context(living), width=900, height=600),
+        _nested(living, range(5), range(5, 9), width=900, height=600),
+    ):
+        page, errors = open_page(figure.html, viewport={"width": 1600, "height": 900})
+        box = page.locator(".conceptflow-container").bounding_box()
+        assert box["width"] == pytest.approx(900, abs=1)
+        assert box["x"] == pytest.approx((1600 - 900) / 2, abs=1)
+        drawing = _drawn_for_current_size(page)
+        assert drawing["width"] == pytest.approx(900 - 282, abs=2)
+        assert drawing["height"] == pytest.approx(600, abs=1)
+        assert drawing["inside"] and errors == []
+
+
+def test_narrow_windows_put_the_panel_below(open_page):
+    for figure in _window_figures().values():
+        page, errors = open_page(figure.html, viewport={"width": 420, "height": 800})
+        drawing = _drawn_for_current_size(page)
+        svg = page.locator("svg.conceptflow-drawing").bounding_box()
+        panel = page.locator("#conceptflow-details").bounding_box()
+        assert panel["y"] >= svg["y"] + svg["height"] - 1
+        assert drawing["width"] == pytest.approx(420 - 2, abs=2)
+        assert drawing["inside"] and errors == []
+
+
+def _many_objects(n=300):
+    """Contexts in which each concept introduces dozens of long object names."""
+    rng = np.random.default_rng(1)
+    names = [f"Object number {i} with a rather long name" for i in range(n)]
+    field = np.eye(4, dtype=bool)[rng.integers(0, 4, n)]
+    kind = np.eye(3, dtype=bool)[rng.integers(0, 3, n)]
+    outer = FormalContext.from_array(field, objects=names,
+                                     attributes=[f"field {k}" for k in range(4)])
+    inner = FormalContext.from_array(kind, objects=names,
+                                     attributes=[f"kind {k}" for k in range(3)])
+    return outer, inner
+
+
+_LABELS = """() => Object.fromEntries(['attr-label', 'obj-label', 'inner-attr'].map(c => [c,
+    [...document.querySelectorAll('text.' + c)].map(t => ({
+        text: t.textContent, shown: t.getAttribute('display') !== 'none' }))]))"""
+
+
+def _check_label_buttons(page):
+    labels = page.evaluate(_LABELS)
+    objects = labels["obj-label"]
+    assert objects and all(label["shown"] for label in objects)
+    # At most 6 names, then how many more there are.
+    for label in objects:
+        names = label["text"].split(", ")
+        assert len(names) <= 7
+        if len(names) == 7:
+            assert names[-1].startswith("+") and int(names[-1][1:]) > 0
+    page.click("#conceptflow-object-labels")
+    labels = page.evaluate(_LABELS)
+    assert not any(label["shown"] for label in labels["obj-label"])
+    assert all(label["shown"] for label in labels["attr-label"] + labels["inner-attr"])
+    assert page.get_attribute("#conceptflow-object-labels", "aria-pressed") == "false"
+    page.click("#conceptflow-attribute-labels")
+    labels = page.evaluate(_LABELS)
+    assert not any(label["shown"] for group in labels.values() for label in group)
+    page.click("#conceptflow-object-labels")
+    labels = page.evaluate(_LABELS)
+    assert all(label["shown"] for label in labels["obj-label"])
+    assert not any(label["shown"] for label in labels["attr-label"] + labels["inner-attr"])
+
+
+def test_label_buttons_and_shortened_labels(open_page):
+    outer, inner = _many_objects()
+    page, errors = open_page(plot_lattice(ConceptLattice.from_context(outer)).html)
+    _check_label_buttons(page)
+    assert errors == []
+
+    page, errors = open_page(plot_nested(outer, inner=inner).html, accept_downloads=True)
+    _check_label_buttons(page)
+    # Attribute labels are hidden now: the saved drawing leaves them out.
+    with page.expect_download(timeout=15000) as download:
+        page.click("#conceptflow-save-svg")
+    saved = download.value.path().read_text(encoding="utf-8")
+    assert 'class="obj-label"' in saved and 'class="attr-label"' not in saved
+    # The labels are shortened; the details list every object.
+    page.click("#conceptflow-attribute-labels")
+    first = page.evaluate(_LABELS)["obj-label"][0]["text"]
+    assert first.split(", ")[-1].startswith("+")
+    assert errors == []
+
+
+def test_label_options_set_the_start(open_page):
+    outer, inner = _many_objects(40)
+    page, errors = open_page(
+        plot_nested(outer, inner=inner, show_object_labels=False, max_label_items=2).html
+    )
+    labels = page.evaluate(_LABELS)
+    assert labels["obj-label"] and not any(label["shown"] for label in labels["obj-label"])
+    assert all(len(label["text"].split(", ")) <= 3 for label in labels["obj-label"])
+    assert page.get_attribute("#conceptflow-object-labels", "aria-pressed") == "false"
+    assert errors == []
