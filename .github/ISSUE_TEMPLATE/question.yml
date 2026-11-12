@@ -1,0 +1,17 @@
+name: Question
+description: Ask how to do something with ConceptFlow.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        The [documentation](https://conceptflow.readthedocs.io) may already
+        answer it: the guide has worked examples for contexts, lattices,
+        implications, scaling, visualization and factorization.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you want to do, and what you have tried (code helps).
+    validations:
+      required: true

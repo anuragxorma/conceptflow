@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest something ConceptFlow should do.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: What you want to do
+      description: >
+        The task or analysis you have in mind, and what ConceptFlow is missing
+        for it.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could look
+      description: >
+        Optional: a sketch of the code you would like to write, or a reference
+        (a paper, another tool) that describes the method.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you do now
+      description: "Optional: how you solve it today, if at all."

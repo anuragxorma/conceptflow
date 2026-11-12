@@ -1,7 +1,8 @@
 # Contributing to ConceptFlow
 
 Thank you for your interest in ConceptFlow. Questions, bug reports, ideas and
-code are all welcome.
+code are all welcome. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 ## Getting help and reporting problems
 
@@ -13,6 +14,9 @@ for questions, bug reports and feature requests. For a bug, please include:
 - what happened and what you expected;
 - your ConceptFlow, Python and scikit-learn versions
   (`python -c "import conceptflow, sklearn, sys; print(conceptflow.__version__, sklearn.__version__, sys.version)"`).
+
+Please report security problems privately, as described in
+[SECURITY.md](SECURITY.md), not in a public issue.
 
 ## Setting up
 

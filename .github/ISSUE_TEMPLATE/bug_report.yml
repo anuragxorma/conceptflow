@@ -1,0 +1,37 @@
+name: Bug report
+description: Something gives a wrong result, an error, or a broken drawing.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code that reproduces it
+      description: >
+        A few lines that show the problem. A small context is enough;
+        `conceptflow.datasets` has ready-made ones.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error or output
+      description: The full error message (traceback) or the wrong output.
+      render: shell
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: >
+        The output of
+        `python -c "import conceptflow, sklearn, sys; print(conceptflow.__version__, sklearn.__version__, sys.version)"`,
+        and your operating system.
+    validations:
+      required: true

@@ -39,6 +39,12 @@
   The line diagram page also has a *Reset zoom* button, and the nested
   page's saved files contain only the labels that are shown.
 
+### Repository
+
+- A code of conduct (Contributor Covenant 2.1), a security policy with
+  private reporting, issue templates for bugs, feature requests and
+  questions, and a pull request template.
+
 ## 0.6.1 (2026-11-10)
 
 Fixes only, no new features. The main ones: the third and deeper levels
