@@ -517,10 +517,28 @@ def test_label_buttons_and_shortened_labels(open_page):
         page.click("#conceptflow-save-svg")
     saved = download.value.path().read_text(encoding="utf-8")
     assert 'class="obj-label"' in saved and 'class="attr-label"' not in saved
-    # The labels are shortened; the details list every object.
+    # The labels are shortened.
     page.click("#conceptflow-attribute-labels")
     first = page.evaluate(_LABELS)["obj-label"][0]["text"]
     assert first.split(", ")[-1].startswith("+")
+    assert errors == []
+
+
+def test_hidden_labels_do_not_decide_the_pdf_kind(open_page):
+    # Names outside Latin-1 force the image PDF, but only if they are shown.
+    outer = FormalContext.from_array([[1, 0, 1], [0, 1, 1], [1, 1, 0]],
+                                     objects=["α", "β", "γ"], attributes=["a", "b", "c"])
+    inner = FormalContext.from_array([[1], [0], [1]], objects=["α", "β", "γ"], attributes=["d"])
+    page, errors = open_page(plot_nested(outer, inner=inner, show_object_labels=False).html,
+                             accept_downloads=True)
+    sizes = []
+    for _ in range(2):
+        with page.expect_download(timeout=15000) as download:
+            page.click("#conceptflow-save-pdf")
+        sizes.append(len(download.value.path().read_bytes()))
+        page.click("#conceptflow-object-labels")  # show the Greek names
+    vector, image = sizes
+    assert vector < 50_000 < image
     assert errors == []
 
 

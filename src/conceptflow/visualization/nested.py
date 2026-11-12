@@ -1630,7 +1630,7 @@ d3.select("#conceptflow-object-labels").on("click", () => {{
 // failed plugin load fall back to the image PDF below.
 function savePDF() {{
   const svgEl = document.getElementById("conceptflow-nested-svg");
-  const latin1 = [...svgEl.querySelectorAll("text")]
+  const latin1 = [...svgEl.querySelectorAll('text:not([display="none"])')]
     .every(t => [...t.textContent].every(c => c.charCodeAt(0) < 256));
   if (!window.jspdf?.jsPDF?.API?.svg || !latin1) {{
     saveImagePDF();

@@ -167,8 +167,6 @@ def main() -> None:
 
     fig_default = plot_nested(
         root,
-        width=1150,
-        height=780,
         title="Diabetes nested exploration: child previews",
     )
     path_default = fig_default.open("nested_diagram_diabetes_previews.html")

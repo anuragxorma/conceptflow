@@ -103,8 +103,9 @@ panel and below the header, and fits itself again when the window is
 resized. If you have zoomed or panned, your view is kept until you click
 *Reset zoom*. In a notebook the drawing is as wide as the cell and 700 px
 high. Numbers fix the size in pixels, e.g. `width=900, height=700`; `width`
-then includes the details panel. In windows narrower than 560 px the panel
-moves below the drawing.
+then includes the details panel. The panel moves below the drawing in
+windows narrower than 560 px (with `width="auto"`) or in pages with a fixed
+`width` below 560.
 
 ## matplotlib options
 

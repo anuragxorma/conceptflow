@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.6.2 (2026-11-12)
+
+`edge_crossing_score` follows the definition of the drawing-quality paper
+and counts crossings it left out before, so its values change. The
+interactive pages fill the browser window instead of a fixed 900 × 700 px,
+the nested page shortens long label lists, and buttons on both pages show
+and hide the labels. Existing code keeps working.
 
 ### Fixed
 
@@ -44,6 +50,8 @@
 - A code of conduct (Contributor Covenant 2.1), a security policy with
   private reporting, issue templates for bugs, feature requests and
   questions, and a pull request template.
+- The examples that open interactive pages no longer fix their size, so
+  they fill the window.
 
 ## 0.6.1 (2026-11-10)
 

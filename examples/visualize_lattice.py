@@ -29,11 +29,8 @@ def main() -> None:
         layout="dimflux",
     )
 
-    fig = cf.visualization.render_with_d3(
-        graph_data,
-        width=1150,
-        height=780,
-    )
+    # The page fills the browser window; width= and height= fix its size.
+    fig = cf.visualization.render_with_d3(graph_data)
 
     output_path = fig.open("triangles_lattice.html")
 

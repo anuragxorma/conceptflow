@@ -67,6 +67,21 @@ def test_html_size_rejects_text_and_zero_height():
         plot_lattice(make_lattice(), layout="layered", height=0)
 
 
+@pytest.mark.parametrize("backend", ["d3", "matplotlib"])
+@pytest.mark.parametrize(
+    "size, error",
+    [(float("nan"), ValueError), (float("inf"), ValueError), (True, TypeError), ("x", TypeError)],
+)
+def test_html_size_rejects_values_that_are_not_pixels(backend, size, error):
+    if backend == "matplotlib":
+        pytest.importorskip("matplotlib")
+    with pytest.raises(error, match="width"):
+        plot_lattice(make_lattice(), backend=backend, layout="layered", width=size)
+    if backend == "d3":
+        with pytest.raises(error, match="height"):
+            plot_nested(make_nested_view(), height=size)
+
+
 def test_nested_d3_label_options():
     import json
     import re

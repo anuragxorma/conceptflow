@@ -585,8 +585,6 @@ def main() -> None:
 
     fig = plot_nested(
         root,
-        width=1400,
-        height=900,
         title="Eurovision winners: voting cluster support → BPM × key mode",
         object_label=lambda y: year_to_display.get(y, y),
     )

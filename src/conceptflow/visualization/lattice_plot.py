@@ -5,6 +5,7 @@ Public plotting entry points for ConceptFlow lattice visualization.
 from __future__ import annotations
 
 from conceptflow.core import ConceptLattice
+from conceptflow.visualization._checks import check_page_size
 from conceptflow.visualization.d3_backend import render_with_d3
 from conceptflow.visualization.dimflux_layout import lattice_to_graph_data_dimflux
 from conceptflow.visualization.graph_data import lattice_to_graph_data
@@ -129,6 +130,8 @@ def plot_lattice(
     if backend == "matplotlib":
         from conceptflow.visualization.static import render_lattice_matplotlib
 
+        check_page_size(width, "width")
+        check_page_size(height, "height")
         figure_width = 900 if width == "auto" else width
         figure_height = 700 if height == "auto" else height
         kwargs.setdefault("figsize", (figure_width / 100, figure_height / 100))

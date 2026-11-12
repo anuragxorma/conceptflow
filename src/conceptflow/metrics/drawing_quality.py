@@ -523,7 +523,9 @@ def edge_crossing_score(drawing) -> float:
       entirely below the other, which cannot cross in an upward drawing.
 
     Pairs of edges with only some endpoints comparable can cross and are
-    counted. 1.0 if no pair of edges could cross (a chain, for example). A
+    counted. An edge of (almost) zero length, between two nodes drawn at one
+    point, crosses nothing; ``node_node_conflict_score`` measures such
+    overlaps. 1.0 if no pair of edges could cross (a chain, for example). A
     drawing that is not upward can also have crossings between pairs counted
     in ``X_comp``; they count as crossings too, and the score is then clipped
     at 0.

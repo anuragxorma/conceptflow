@@ -4,6 +4,7 @@ Argument checks and page layout shared by the renderers.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from numbers import Integral, Real
 
@@ -106,12 +107,17 @@ function conceptflowSizer(svgNode, autoHeight, draw) {
 """ % {"marker": NOTEBOOK_MARKER, "min_height": MIN_DRAWING_HEIGHT}
 
 
-def _check_page_size(value, name: str) -> None:
+def check_page_size(value, name: str) -> None:
+    """``"auto"`` or a positive, finite number of pixels."""
     if isinstance(value, str):
         if value != "auto":
             raise TypeError(f'{name} must be "auto" or a number of pixels, got {value!r}.')
         return
+    if isinstance(value, bool):
+        raise TypeError(f'{name} must be "auto" or a number of pixels, got {value!r}.')
     check_scalar(value, name, Real, min_val=0, include_boundaries="neither")
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite number of pixels, got {value!r}.")
 
 
 def html_page_layout(width, height) -> dict:
@@ -125,8 +131,8 @@ def html_page_layout(width, height) -> dict:
     narrower than 560 px. Returns ``css``, ``auto_height`` and
     ``figure_height`` (the drawing height a notebook frame starts with).
     """
-    _check_page_size(width, "width")
-    _check_page_size(height, "height")
+    check_page_size(width, "width")
+    check_page_size(height, "height")
     auto_height = isinstance(height, str)
     drawing_height = NOTEBOOK_DRAWING_HEIGHT if auto_height else height
 
