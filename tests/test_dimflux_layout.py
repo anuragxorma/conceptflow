@@ -225,3 +225,19 @@ def test_dimflux_does_not_warn_for_an_iceberg_of_a_small_lattice(monkeypatch, re
 def test_dimflux_accepts_numpy_integer_timeout():
     graph_data = lattice_to_graph_data_dimflux(make_lattice(), timeout_ms=np.int64(100))
     assert all(node.x is not None for node in graph_data.nodes)
+
+
+def test_two_concepts_are_drawn_with_the_top_above_the_bottom():
+    # Two concepts skip DimFlux; their hand-made coordinates had the top
+    # below the bottom in the GraphData (the renderers rotated it back, but
+    # the coordinates and the drawing scores used them upside down).
+    from conceptflow.metrics import vertical_axis_balance_score
+
+    for incidence in (np.zeros((3, 3)), [[1, 0], [1, 1]]):
+        lattice = ConceptLattice.from_context(FormalContext.from_array(np.asarray(incidence)))
+        assert lattice.n_concepts == 2
+        graph_data = lattice_to_graph_data_dimflux(lattice)
+        nodes = graph_data.node_map()
+        (edge,) = graph_data.edges
+        assert nodes[edge.target].y < nodes[edge.source].y  # screen: y grows downwards
+        assert vertical_axis_balance_score(graph_data) == 1.0

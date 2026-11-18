@@ -157,12 +157,12 @@ def lattice_to_graph_data_dimflux(
 
     # DimFlux needs at least two concepts, and for exactly two it returns
     # (almost) the same point twice: draw those by hand, top above bottom
-    # (screen coordinates, y grows downwards).
+    # (DimFlux coordinates, y grows upwards; flipped below).
     if lattice.n_concepts < 2:
         coordinates = {concept.extent: np.zeros(2) for concept in lattice.concepts}
     elif lattice.n_concepts == 2:
         coordinates = {
-            concept.extent: np.array([0.0, 0.0 if concept == lattice.top() else 1.0])
+            concept.extent: np.array([0.0, 1.0 if concept == lattice.top() else 0.0])
             for concept in lattice.concepts
         }
     else:
