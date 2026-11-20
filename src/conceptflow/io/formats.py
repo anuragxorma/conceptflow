@@ -39,6 +39,17 @@ def context_to_json(context: FormalContext) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def _json_names(value, what: str) -> list:
+    """Object or attribute names from JSON: a list of strings or numbers."""
+    if not isinstance(value, list) or not all(
+        isinstance(name, (str, int, float)) and not isinstance(name, bool) for name in value
+    ):
+        raise ValueError(
+            f"The JSON context's {what} must be a list of names, got {str(value)[:60]}."
+        )
+    return value
+
+
 def context_from_json(text: str) -> FormalContext:
     """Parse a context from FCART/fcapy JSON or the plain dict layout."""
     data = json.loads(text)
@@ -53,7 +64,15 @@ def context_from_json(text: str) -> FormalContext:
                 f"The JSON context has no {exc.args[0]!r} entry: expected the "
                 'FCART/fcapy layout or {"objects", "attributes", "incidence"}.'
             ) from None
-        return FormalContext(objects=objects, attributes=attributes, incidence=incidence)
+        if not isinstance(incidence, list):
+            raise ValueError(
+                f"The JSON context's incidence must be a list of rows, got {str(incidence)[:60]}."
+            )
+        return FormalContext(
+            objects=_json_names(objects, "objects"),
+            attributes=_json_names(attributes, "attributes"),
+            incidence=incidence,
+        )
 
     try:
         header, body = data
@@ -66,6 +85,8 @@ def context_from_json(text: str) -> FormalContext:
             '{"objects", "attributes", "incidence"}.'
         ) from exc
 
+    objects = _json_names(objects, "objects")
+    attributes = _json_names(attributes, "attributes")
     if len(rows) != len(objects):
         raise ValueError(
             f"The JSON context names {len(objects)} objects but has {len(rows)} rows."

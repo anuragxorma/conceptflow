@@ -88,6 +88,18 @@ def _check_unique_names(names: tuple[str, ...], kind: str) -> None:
     )
 
 
+def as_cell_array(data) -> np.ndarray:
+    """
+    ``np.asarray(data)``, except that a list mixing numbers and strings keeps
+    each cell as it is: NumPy would turn it into strings ([2, "x"] becomes
+    ["2", "x"]), and the string "2" is not a cross while the number 2 is.
+    """
+    array = np.asarray(data)
+    if array.dtype.kind in "US" and not isinstance(data, np.ndarray):
+        array = np.asarray(data, dtype=object)
+    return array
+
+
 def _cross_table(data) -> np.ndarray:
     """
     Convert incidence data to a boolean cross table, cell by cell:
@@ -105,7 +117,7 @@ def _cross_table(data) -> np.ndarray:
     """
     if scipy.sparse.issparse(data):
         data = data.toarray()
-    raw = np.asarray(data)
+    raw = as_cell_array(data)
 
     if raw.dtype == bool:
         # Copy, so later changes to the caller's array cannot alter a frozen
@@ -240,7 +252,7 @@ class FormalContext:
         """
         if scipy.sparse.issparse(data):
             data = data.toarray()
-        array = np.asarray(data)
+        array = as_cell_array(data)
 
         if array.ndim != 2:
             raise ValueError("Formal context data must be two-dimensional.")

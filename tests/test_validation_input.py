@@ -102,3 +102,40 @@ def test_check_binary_context_input_rejects_object_dtype_non_numeric():
     X = np.array([[{"a": 1}, 0], [0, 1]], dtype=object)
     with pytest.raises(TypeError):
         check_binary_context_input(X)
+
+
+# Found by tests/test_properties_input.py: the same cells were read
+# differently depending on the container they came in.
+
+
+@pytest.mark.parametrize(
+    "X",
+    [
+        [["2", "1"]],
+        np.array([["2", "1"]]),
+        np.array([["1.5", "x"]], dtype=object),
+        pd.DataFrame([["-1", "1"]]),
+    ],
+)
+def test_numeric_strings_are_refused_in_every_container(X):
+    # Only known spellings ("1", "x", "true", ...) are crosses; arrays read
+    # "2" or "1.5" as numbers before, lists and DataFrames refused them.
+    with pytest.raises(ValueError, match="Cannot read"):
+        check_binary_context_input(X)
+    with pytest.raises(ValueError, match="Cannot read"):
+        FormalContext.from_array(np.asarray(X, dtype=object))
+
+
+def test_numbers_in_a_list_with_strings_stay_numbers():
+    # NumPy turns [2, "x"] into ["2", "x"]; the number 2 is a cross.
+    rows = [[2, "x"], [0, "."]]
+    expected = [[True, True], [False, False]]
+    assert FormalContext.from_array(rows).incidence.tolist() == expected
+    assert check_binary_context_input(rows).incidence.tolist() == expected
+
+
+@pytest.mark.parametrize("cell", [pd.NA, None, np.nan, np.inf, 1j])
+def test_missing_infinite_and_complex_cells_raise_value_error(cell):
+    for X in ([[cell, 1]], [[cell, "x"]], np.array([[cell, 1]], dtype=object)):
+        with pytest.raises(ValueError):
+            check_binary_context_input(X)

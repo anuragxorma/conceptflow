@@ -114,3 +114,20 @@ def test_out_of_range_index_suggests_the_name():
     with pytest.raises(IndexError, match="pass the string '5'"):
         context.object_derivation([5])
     assert context.object_derivation(["5"]) == frozenset({0})
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '[{"ObjNames": null, "Params": {"AttrNames": []}}, {"Count": 0, "Data": []}]',
+        '[{"ObjNames": [], "Params": {"AttrNames": 3}}, {"Count": 0, "Data": []}]',
+        '{"objects": "abc", "attributes": [], "incidence": [[], [], []]}',
+        '{"objects": null, "attributes": [], "incidence": []}',
+        '{"objects": [], "attributes": [], "incidence": null}',
+    ],
+)
+def test_json_contexts_with_names_that_are_not_lists_are_refused(text):
+    # Found by tests/test_properties_input.py: "ObjNames": null raised a
+    # TypeError, and "objects": "abc" became three objects a, b, c.
+    with pytest.raises(ValueError):
+        context_from_json(text)

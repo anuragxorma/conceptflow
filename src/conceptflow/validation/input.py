@@ -9,7 +9,7 @@ import pandas as pd
 from scipy import sparse
 
 from conceptflow.core import FormalContext, IncompleteContext
-from conceptflow.core.context import _cross_table
+from conceptflow.core.context import _cross_table, as_cell_array
 
 _UNKNOWN_HINT = (
     "Binary-context estimators need complete data. Choose a completion with "
@@ -52,7 +52,7 @@ def check_binary_context_input(X) -> FormalContext:
     if sparse.issparse(X):
         array = X.toarray()
     else:
-        array = np.asarray(X)
+        array = as_cell_array(X)
 
     if np.iscomplexobj(array):
         raise ValueError("Complex data not supported")
@@ -61,20 +61,28 @@ def check_binary_context_input(X) -> FormalContext:
         array = array.astype(object)
 
     if array.dtype == object:
-        # Try to coerce to numeric — raises TypeError with sklearn-compatible
-        # message if elements cannot be converted (e.g. dicts, arbitrary objects).
-        try:
-            array = array.astype(float)
-        except ValueError:
+        cells = array.ravel().tolist()
+        if any(cell is pd.NA for cell in cells) or pd.isna(array).any():
+            raise ValueError(
+                "Input contains NaN: missing entries. If empty cells mean "
+                '"no cross", pass FormalContext.from_array(X) instead.'
+            )
+        if any(isinstance(cell, complex) for cell in cells):
+            raise ValueError("Complex data not supported")
+        if any(
+            isinstance(cell, (float, np.floating)) and not np.isfinite(cell) for cell in cells
+        ):
+            raise ValueError("Input contains infinity or a value too large.")
+        if any(isinstance(cell, (str, bytes)) for cell in cells):
             # Strings such as "x" / ".": read cell by cell, as FormalContext
-            # does (unknown spellings raise a ValueError naming the value).
-            # Empty cells are still rejected, as for numeric input.
-            if pd.isna(array).any():
-                raise ValueError(
-                    "Input contains NaN: missing entries. If empty cells mean "
-                    '"no cross", pass FormalContext.from_array(X) instead.'
-                ) from None
+            # and DataFrames are, so "2" or "1.5" are refused whatever the
+            # other cells hold (unknown spellings raise a ValueError naming
+            # the value).
             array = _cross_table(array)
+        else:
+            # Numbers: raises TypeError with scikit-learn's message for
+            # anything else (e.g. dicts, arbitrary objects).
+            array = array.astype(float)
 
     if array.ndim != 2:
         raise ValueError(
