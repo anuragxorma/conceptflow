@@ -552,3 +552,29 @@ def test_label_options_set_the_start(open_page):
     assert all(len(label["text"].split(", ")) <= 3 for label in labels["obj-label"])
     assert page.get_attribute("#conceptflow-object-labels", "aria-pressed") == "false"
     assert errors == []
+
+
+# Every input of the feature matrix (tests/test_feature_matrix.py): both
+# interactive pages load without script errors and draw every concept.
+from tests.test_feature_matrix import INPUT_NAMES, make_lattice, split_in_two  # noqa: E402
+
+
+@pytest.mark.parametrize("input_name", INPUT_NAMES)
+def test_pages_of_every_matrix_input(open_page, input_name):
+    lattice = make_lattice(input_name)
+    page, errors = open_page(plot_lattice(lattice, layout="layered").html)
+    assert page.evaluate("() => document.querySelectorAll('svg g.node-group').length") == (
+        lattice.n_concepts
+    )
+    page.click("text=Attribute labels")
+    page.click("text=Object labels")
+    assert errors == []
+
+    outer, inner = split_in_two(lattice.context)
+    nested = plot_nested(outer, inner=inner, timeout_ms=200)
+    page, errors = open_page(nested.html)
+    outer_concepts = ConceptLattice.from_context(outer).n_concepts
+    assert page.evaluate(
+        "() => document.querySelectorAll('#conceptflow-nested-svg g.node-group').length"
+    ) == outer_concepts
+    assert errors == []

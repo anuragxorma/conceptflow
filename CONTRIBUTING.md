@@ -48,6 +48,19 @@ pip install playwright && playwright install firefox
 pytest tests/test_browser.py
 ```
 
+The property-based tests (`tests/test_properties_*.py`, with
+[Hypothesis](https://hypothesis.readthedocs.io)) try 100 random contexts per
+property. Before a release, or after changing an algorithm, let them try
+more:
+
+```bash
+HYPOTHESIS_PROFILE=thorough pytest tests/test_properties_*.py
+```
+
+`tests/test_cross_library.py` compares the results with the other Python
+FCA libraries: fcapy and caspailleur (installed with DimFlux) and concepts
+(in the `dev` extra).
+
 The same checks, browser tests included, run automatically on every push and
 pull request.
 
@@ -56,7 +69,9 @@ pull request.
 - **Tests:** every fix comes with a test that fails without it, and every
   feature with tests of its behaviour. Algorithms are best tested against a
   simple reference implementation (the `*_bruteforce` functions, or a direct
-  transcription of the definition) on many small random contexts.
+  transcription of the definition) on many small random contexts; laws and
+  definitions go into the property-based tests, and new features into the
+  input matrix of `tests/test_feature_matrix.py`.
 - **scikit-learn compatibility:** estimators follow the scikit-learn API and
   are added to `tests/test_check_estimator.py`.
 - **Documentation:** public functions and classes have numpy-style

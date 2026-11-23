@@ -54,6 +54,11 @@ dev = [
     "scikit-learn>=1.6",
     "pytest",
     "pytest-cov",
+    # Property-based tests (tests/test_properties_*.py).
+    "hypothesis",
+    # Results compared with another FCA library (tests/test_cross_library.py;
+    # fcapy and caspailleur come with DimFlux).
+    "concepts",
     "ruff",
 ]
 

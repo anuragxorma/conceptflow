@@ -1,5 +1,70 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **DimFlux layouts of lattices with exactly two concepts had the top below
+  the bottom.** These lattices skip DimFlux and get hand-made coordinates,
+  which were flipped. The figures were right (the renderers rotate DimFlux
+  drawings upright), but the coordinates of
+  `plot_lattice(..., backend="graph_data")` were upside down and
+  `vertical_axis_balance_score` gave 0.0 instead of 1.0.
+- **A table's cells were read differently depending on the container.**
+  Strings are crosses only in the known spellings ("1", "x", "true", ...),
+  but NumPy arrays read strings such as "2", "1.5" or "-1" as numbers, and
+  in a list the result depended on the other cells (`[["2", "1"]]` was
+  accepted, `[["2", "x"]]` refused). Such strings are now refused in every
+  container, so **arrays of numeric strings other than "0" and "1" raise
+  `ValueError`**; convert them to numbers first. Numbers in a list that also
+  holds strings stay numbers (NumPy turned `[[2, "x"]]` into `[["2", "x"]]`,
+  so the 2 was refused), in `FormalContext` and in the estimators.
+- **`pd.NA`, complex numbers and infinity mixed with strings** in the input
+  of an estimator raise `ValueError` like other missing or invalid values,
+  instead of a `TypeError` or being read as a cross.
+- **`read_json` and `context_from_json` accepted object or attribute names
+  that are not a list:** `"ObjNames": null` raised a `TypeError`, and
+  `"objects": "abc"` gave three objects a, b and c. Both raise `ValueError`
+  now.
+
+### Repository
+
+- **Property-based tests** with Hypothesis (`tests/test_properties_*.py`):
+  laws and definitions of the core (derivations, concepts, lattice order,
+  meets and joins, the canonical, proper-premise and Luxenburger bases,
+  minimal generators, stability, order measures, context operations,
+  reduction, scale-measures), file round trips with arbitrary names,
+  incomplete contexts against all their completions, nested diagrams on
+  every level, conceptual scaling, the meaning of every estimator's output
+  columns, and drawing scores that do not depend on where a drawing is or
+  how large it is; on contexts of every shape,
+  including empty ones and ones wider than 64 attributes.
+- **A feature × input matrix** (`tests/test_feature_matrix.py`): every
+  layout, backend, measure, basis, nested diagram, file format and
+  estimator (alone, in a `Pipeline` and in a `ColumnTransformer`) on inputs
+  such as contexts without objects or attributes, a single concept, special
+  and integer names, iceberg lattices, sparse input and 70 attributes; the
+  browser tests open the interactive pages of every input.
+- **Comparison with fcapy, caspailleur and concepts**
+  (`tests/test_cross_library.py`): concepts, covers, meets and joins,
+  stability and its bounds, Δ-stability, keys and passkeys, the canonical
+  and proper-premise bases, linearity and distributivity indices, and files
+  exchanged in both directions. `concepts` is a new development dependency.
+- **Malformed input** (`tests/test_properties_input.py`): corrupted and
+  arbitrary `.cxt`, CSV and JSON files are read or refused with
+  `ValueError`, files with Windows line endings or a byte-order mark read
+  the same, and a table is read the same way in every container.
+- **Reproducibility** (`tests/test_reproducibility.py`): about 300 outputs
+  (drawings, pages, TikZ, Graphviz, bases, files, estimators, nested
+  diagrams) are the same in Python processes with different hash seeds.
+- **Backends agree** (`tests/test_backend_consistency.py`): the interactive
+  page, matplotlib, TikZ and Graphviz show the same nodes, edges and
+  labels, at the places `layout_positions` gives; static nested figures
+  label each object once, at its place.
+- **scikit-learn workflows** (`tests/test_sklearn_workflows.py`): parallel
+  searches, pandas output, concept ids across folds, `missing="unknown"`
+  with an imputer, joblib, unchanged input and row order.
+
 ## 0.6.2 (2026-11-12)
 
 `edge_crossing_score` follows the definition of the drawing-quality paper
