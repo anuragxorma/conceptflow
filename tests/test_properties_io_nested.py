@@ -333,3 +333,38 @@ def test_every_nested_level_is_one_nested_diagram(data, depth):
     labels = []
     walk(nested["nodes"], 0, (), contexts, labels)
     assert sorted(labels) == sorted(data.index)  # every object exactly once
+
+
+def check_drawn_like_the_preview(view):
+    """
+    Every view says which nodes the page puts above each other to turn it
+    upright: its top and bottom concept. A view entered by a click is the
+    template of the bubble with its extents cut down, so it must use the
+    template's nodes, places and orientation, not guess them from its extents.
+    """
+    ids = {node["id"] for node in view["nodes"]}
+    assert {view["orientation"]["top"], view["orientation"]["bottom"]} <= ids
+    template = view["inner_template"]
+    if template is not None:
+        sizes = {node["id"]: node["extent_size"] for node in template["nodes"]}
+        assert sizes[template["orientation"]["top"]] == max(sizes.values())
+        assert sizes[template["orientation"]["bottom"]] == min(sizes.values())
+        places = {node["id"]: (node["x"], node["y"]) for node in template["nodes"]}
+    for node in view["nodes"]:
+        child = node["child"]
+        if child is None:
+            continue
+        if template is not None:
+            assert child["orientation"] == template["orientation"]
+            assert {n["id"]: (n["x"], n["y"]) for n in child["nodes"]} == places
+        check_drawn_like_the_preview(child)
+
+
+@settings(max_examples=25)
+@given(many_valued_data(), st.integers(2, 4))
+def test_entered_views_are_drawn_like_their_previews(data, depth):
+    levels = LEVEL_SCALES[:depth]
+    builder = ExplorationBuilder(ManyValuedContext.from_dataframe(data))
+    root = builder.root("root", levels[0])
+    expand_everything(builder, root, levels)
+    check_drawn_like_the_preview(exploration_view_to_nested_data(root, timeout_ms=50))

@@ -125,8 +125,20 @@ def _inner_template_data(
             {"source": e.source, "target": e.target}
             for e in inner_gd.edges
         ],
+        "orientation": _orientation(template_view.lattice),
         "gamma_by_name": gamma_by_name,
     }
+
+
+def _orientation(lattice) -> dict[str, str]:
+    """
+    The nodes the page puts straight above each other (top above bottom) to
+    turn a DimFlux drawing upright. Given explicitly because a view entered
+    by a click shows the template with the extents cut down to the outer
+    concept's objects, where the largest and smallest extents are no longer
+    unique; it must be turned like the template drawn inside the bubble.
+    """
+    return {"top": lattice.top().stable_id(), "bottom": lattice.bottom().stable_id()}
 
 
 def debug_filled_pairs(view: ExplorationView) -> None:
@@ -696,6 +708,8 @@ def _nested_data(
                 "inner_template": next_inner_template,
                 "nodes": child_nodes,
                 "edges": inner_template["edges"],
+                # Drawn at the angle of the preview inside the bubble.
+                "orientation": inner_template["orientation"],
                 "metadata": {
                     "context_size": (node.metadata["extent_size"], 0),
                     "n_concepts": len(inner_template["nodes"]),
@@ -746,6 +760,7 @@ def _nested_data(
         "scale_names": list(view.scale_names),
         "nodes": nodes,
         "edges": edges,
+        "orientation": _orientation(view.lattice),
         "inner_template": inner_template,
         "metadata": {
             "context_size": (
@@ -1151,10 +1166,15 @@ function closestDistance(nodes) {{
   return best;
 }}
 
-function computeTransform(nodes, targetWidth, targetHeight, padding) {{
-  const topNode = nodes.reduce((best, d) =>
+// `orientation` ({{top, bottom}} node ids) says which nodes go straight above
+// each other; a view entered by a click uses its template's, so it is drawn
+// at the angle of the preview (its extents are cut down to the objects of
+// the outer concept, so the largest and smallest are not unique there).
+function computeTransform(nodes, targetWidth, targetHeight, padding, orientation) {{
+  const byId = new Map(nodes.map(d => [d.id, d]));
+  const topNode = byId.get(orientation?.top) ?? nodes.reduce((best, d) =>
     extentSize(d) > extentSize(best) ? d : best, nodes[0]);
-  const bottomNode = nodes.reduce((best, d) =>
+  const bottomNode = byId.get(orientation?.bottom) ?? nodes.reduce((best, d) =>
     extentSize(d) < extentSize(best) ? d : best, nodes[0]);
 
   const bx = bottomNode.x ?? 0;
@@ -1323,7 +1343,9 @@ function drawTemplatePreview(parentGroup, innerTemplate, filledInner, radius, sh
   const innerSize = radius * 1.55;
   const padding = Math.min(8, innerSize / 6);
 
-  const transform = computeTransform(innerTemplate.nodes, innerSize, innerSize, padding);
+  const transform = computeTransform(
+    innerTemplate.nodes, innerSize, innerSize, padding, innerTemplate.orientation
+  );
 
   const childGroup = parentGroup
     .append("g")
@@ -1371,7 +1393,9 @@ function drawChildPreview(parentGroup, childData, radius) {{
   const innerSize = radius * 1.35;
   const padding = Math.min(8, innerSize / 6);
 
-  const transform = computeTransform(childData.nodes, innerSize, innerSize, padding);
+  const transform = computeTransform(
+    childData.nodes, innerSize, innerSize, padding, childData.orientation
+  );
 
   const childGroup = parentGroup
     .append("g")
@@ -1418,7 +1442,7 @@ function drawView(size) {{
 
   const transform = computeTransform(
     viewData.nodes, size.width, size.height,
-    Math.min(100, size.width / 6, size.height / 6)
+    Math.min(100, size.width / 6, size.height / 6), viewData.orientation
   );
   const nodeById = new Map(viewData.nodes.map(d => [d.id, d]));
 
@@ -1483,7 +1507,7 @@ function drawView(size) {{
 
   // Draw inner template preview (subdirect decomposition) or plain child preview.
   // Attr labels shown only in the top outer node's bubble (largest extent).
-  const topOuterId = viewData.nodes.reduce((best, d) =>
+  const topOuterId = viewData.orientation?.top ?? viewData.nodes.reduce((best, d) =>
     extentSize(d) > extentSize(best) ? d : best, viewData.nodes[0]).id;
 
   if (showChildPreviews) {{

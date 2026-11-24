@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- **In interactive nested diagrams, a view entered by clicking a node was
+  often drawn at another angle than the small diagram inside that node.**
+  The page turns DimFlux drawings upright by putting the node with the
+  largest extent above the one with the smallest, but in an entered view the
+  extents are cut down to the objects of the clicked node, so several nodes
+  tie and the page could pick others (and drew the view of an empty node as
+  a single point). The nested data now names each view's top and bottom
+  node (`"orientation"`), and an entered view uses the template's, so it
+  looks like its preview on every level.
 - **DimFlux layouts of lattices with exactly two concepts had the top below
   the bottom.** These lattices skip DimFlux and get hand-made coordinates,
   which were flipped. The figures were right (the renderers rotate DimFlux

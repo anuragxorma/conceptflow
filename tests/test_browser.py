@@ -249,6 +249,69 @@ def test_nested_levels_are_drawn_as_their_data(open_page):
     assert errors == []
 
 
+_PREVIEWS = """() => [...document.querySelectorAll(
+    '#conceptflow-nested-svg g.node-group > circle.node-with-child')].map(c =>
+    [...c.parentNode.querySelectorAll('circle.inner-node')].map(n => [
+        d3.select(n).datum().id, +n.getAttribute('cx'), +n.getAttribute('cy'),
+        n.classList.contains('filled'),
+    ]))"""
+
+_VIEW = """() => [...document.querySelectorAll(
+    '#conceptflow-nested-svg g.node-group > circle')].map(c => {
+    const d = d3.select(c).datum();
+    return [d.id, d.screenX, d.screenY, d.is_filled === true];
+})"""
+
+
+def _same_drawing(preview, view):
+    """Same nodes, filled alike, at the same places up to moving and scaling."""
+    assert sorted((i, f) for i, _, _, f in preview) == sorted((i, f) for i, _, _, f in view)
+    where = {i: (x, y) for i, x, y, _ in view}
+    a = np.array([(x, y) for _, x, y, _ in preview])
+    b = np.array([where[i] for i, _, _, _ in preview])
+    a, b = a - a.mean(axis=0), b - b.mean(axis=0)
+    np.testing.assert_allclose(a / np.abs(a).max(), b / np.abs(b).max(), atol=1e-6)
+
+
+def test_entered_views_look_like_their_previews(open_page):
+    # The view entered by clicking a bubble is drawn like the small diagram
+    # inside it: the same nodes, filled alike, at the same angle. (Its
+    # extents are cut down to the bubble's objects, so the page used to pick
+    # another top or bottom node to turn it upright by.) Scales that are not
+    # chains, so a wrong angle shows; on every level.
+    rng = np.random.default_rng(3)
+    df = pd.DataFrame({
+        "color": rng.choice(["red", "blue", "green"], 24),
+        "shape": rng.choice(["round", "square", "oval"], 24),
+        "size": rng.choice([10, 50, 90], 24),
+    }, index=[f"item{i}" for i in range(24)])
+    builder = ExplorationBuilder(ManyValuedContext.from_dataframe(df))
+    root = builder.root("color", [NominalScale("color")])
+    builder.expand_all(root, scales=[NominalScale("shape")])
+    for child in list(root.children.values()):
+        builder.expand_all(child, scales=[ContranominalScale("size")])
+    page, errors = open_page(plot_nested(root, timeout_ms=200).html)
+    compared = {"level 2": 0, "level 3": 0}
+    previews = page.evaluate(_PREVIEWS)
+    for i, preview in enumerate(previews):
+        _click_centre(page, page.locator(
+            "#conceptflow-nested-svg g.node-group > circle.node-with-child").nth(i))
+        _same_drawing(preview, page.evaluate(_VIEW))
+        compared["level 2"] += 1
+        inner_previews = page.evaluate(_PREVIEWS)
+        for j, inner_preview in enumerate(inner_previews):
+            _click_centre(page, page.locator(
+                "#conceptflow-nested-svg g.node-group > circle.node-with-child").nth(j))
+            _same_drawing(inner_preview, page.evaluate(_VIEW))
+            compared["level 3"] += 1
+            page.click("#conceptflow-back")
+            _wait_until_still(page)
+        page.click("#conceptflow-root")
+        _wait_until_still(page)
+    assert min(compared.values()) > 0, compared
+    assert errors == []
+
+
 def _nested(context, outer, inner, **options):
     """``plot_nested`` of ``context`` split into two attribute ranges."""
     return plot_nested(
