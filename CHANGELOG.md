@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.6.3 (2026-11-24)
+
+A clicked node of an interactive nested diagram now opens a view that looks
+like the small diagram drawn inside it, and a table's cells are read the
+same way whether it is a list, a NumPy array or a DataFrame. **One change
+can break existing code:** a NumPy array of strings such as "2" or "1.5"
+was read as numbers and now raises `ValueError`, as such strings already
+did in a DataFrame; convert the array to numbers first (strings "0" and "1"
+are read as before). The release also adds many new tests: property-based
+tests, comparisons with fcapy, caspailleur and concepts, and checks that
+the backends draw the same diagram.
 
 ### Fixed
 
